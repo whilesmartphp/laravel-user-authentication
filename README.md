@@ -1,4 +1,4 @@
-# Whilesmart Authentication Package
+# Whilesmart Laravel User Authentication Package
 
 This Laravel package provides a complete authentication solution with registration, login, password reset, and OpenAPI documentation, all ready to use out of the box.
 
@@ -19,18 +19,18 @@ This Laravel package provides a complete authentication solution with registrati
 1.  **Require the package:**
 
     ```bash
-    composer require whilesmart/authentication
+    composer require whilesmart/laravel-user-authentication
     ```
 
 2.  **Publish the configuration and migrations:**
 
     ```bash
-    php artisan vendor:publish --provider="Whilesmart\Authentication\Providers\AuthenticationServiceProvider"
+    php artisan vendor:publish --provider="Whilesmart\Laravel\User\Authentication\Providers\AuthenticationServiceProvider"
     php artisan migrate
     ```
 
 3.  **Implement Verification (Optional):**
-    * Create a class that implements `Whilesmart\Authentication\Interfaces\VerifierInterface`.
+    * Create a class that implements `Whilesmart\Laravel\User\Authentication\Interfaces\VerifierInterface`.
     * Bind your implementation in a service provider.
     * Configure the verification setting in `config/authentication.php`.
 
