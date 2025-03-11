@@ -1,0 +1,61 @@
+{
+    "name": "whilesmart/laravel-user-authentication",
+    "description": "Package for managing user authentication across our projects",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Kofi Mokome",
+            "email": "kofimokome10@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Whilesmart\\LaravelUserAuthentication\\": "src"
+        }
+    },
+    "require": {
+        "laravel/sanctum": "^4.0",
+        "zircote/swagger-php": "^5.0"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Whilesmart\\LaravelUserAuthentication\\UserAuthenticationServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "require-dev": {
+        "orchestra/testbench": "10.x-dev",
+        "nunomaduro/collision": "v8.x-dev",
+        "laravel/pint": "^1.18",
+        "fakerphp/faker": "1.24.x-dev"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Factories\\": "workbench/database/factories/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
+        }
+    },
+    "scripts": {
+        "pint": [
+            "./vendor/bin/pint"
+        ],
+        "pint:test": [
+            "./vendor/bin/pint --test"
+        ],
+        "post-autoload-dump": [
+            "@clear",
+            "@prepare"
+        ],
+        "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
+        "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "build": "@php vendor/bin/testbench workbench:build --ansi",
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "@build",
+            "@php vendor/bin/testbench serve --ansi"
+        ]
+    }
+}
