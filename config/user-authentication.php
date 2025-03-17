@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+
 return [
-    'controller_namespace' => 'Whilesmart\LaravelUserAuthentication\Http\Controllers\Auth',
+    "app_model" => User::class
 ];
