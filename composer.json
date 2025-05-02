@@ -6,6 +6,10 @@
         {
             "name": "Kofi Mokome",
             "email": "kofimokome10@gmail.com"
+        },
+        {
+            "name": "WhileSmart",
+            "email": "folks@whilesmart.com"
         }
     ],
     "autoload": {
