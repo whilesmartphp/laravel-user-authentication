@@ -24,7 +24,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Whilesmart\\LaravelUserAuthentication\\UserAuthenticationServiceProvider"
+              "AppAuthenticationServiceProvider"
             ]
         }
     },

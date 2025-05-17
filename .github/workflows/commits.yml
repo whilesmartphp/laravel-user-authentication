@@ -31,6 +31,7 @@ jobs:
                 'enh', 'enhance', 'tweak', 'imp', 'improve',
               ]],
               'subject-case': [2, 'always', 'sentence-case'],
+
               'header-max-length': [2, 'always', 80],
             },
             ignores: [
