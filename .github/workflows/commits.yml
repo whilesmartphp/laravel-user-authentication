@@ -31,7 +31,8 @@ jobs:
                 'enh', 'enhance', 'tweak', 'imp', 'improve',
               ]],
               'subject-case': [2, 'always', 'sentence-case'],
-              'header-max-length': [2, 'always', 72],
+
+              'header-max-length': [2, 'always', 80],
             },
             ignores: [
               (commit) => commit.includes('Signed-off-by: dependabot[bot]')
@@ -48,7 +49,7 @@ jobs:
           echo "::error::Invalid commit message format. Please follow the conventional commit guidelines:"
           echo "::error::- Type: One of: feat, fix, docs, style, refactor, test, chore, build, ci, enh, enhance, tweak, imp, improve"
           echo "::error::- Scope (optional): A short name of the part of the codebase affected (e.g., 'auth', 'ui')."
-          echo "::error::- Subject: A brief description of the change, starting with a capital letter and generally in lowercase. Keep it concise (under 72 characters)."
+          echo "::error::- Subject: A brief description of the change, starting with a capital letter and generally in lowercase. Keep it concise (under 80 characters)."
           echo "::error::- Body (optional): More detailed explanation of the change."
           echo "::error::- Footer (optional): Related issue references, etc."
           echo ""
