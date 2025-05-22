@@ -12,11 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('first_name');
             $table->string('last_name')->nullable();
             $table->string('username')->nullable();
             $table->string('phone')->nullable()->unique();
-            $table->dropColumn('name');
+            if (Schema::hasColumn('users', 'name')) {
+                $table->renameColumn('name', 'first_name');
+            } else {
+                $table->string('first_name');
+            }
         });
     }
 
@@ -30,7 +33,7 @@ return new class extends Migration
             $table->dropColumn('last_name');
             $table->dropColumn('username');
             $table->dropColumn('phone');
-            $table->string('name');
+            $table->renameColumn('first_name', 'name');
         });
     }
 };
