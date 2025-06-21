@@ -36,15 +36,13 @@ jobs:
         run: php -r "file_exists('workbench/.env') || copy('workbench/.env.example', 'workbench/.env');"
       - name: Update .env file
         run: |
-            echo "DB_CONNECTION=mysql" >> workbench/.env
-            echo "DB_HOST=127.0.0.1" >> workbench/.env
-            echo "DB_PORT=33306" >> workbench/.env
-            echo "DB_DATABASE=db_test" >> workbench/.env
-            echo "DB_USERNAME=root" >> workbench/.env
-            echo "DB_PASSWORD=password" >> workbench/.env
-            echo "APP_ENV=testing" >> workbench/.env
-      - name: Update Composer Dependencies
-        run: composer update -q --no-ansi --no-interaction --no-scripts --no-suggest --no-progress --prefer-dist
+          echo "DB_CONNECTION=mysql" >> workbench/.env
+          echo "DB_HOST=127.0.0.1" >> workbench/.env
+          echo "DB_PORT=33306" >> workbench/.env
+          echo "DB_DATABASE=db_test" >> workbench/.env
+          echo "DB_USERNAME=root" >> workbench/.env
+          echo "DB_PASSWORD=password" >> workbench/.env
+          echo "APP_ENV=testing" >> workbench/.env
       - name: Install dependencies
         run: composer install -q --no-ansi --no-interaction --no-scripts --no-suggest --no-progress --prefer-dist
       - name: Run migrations
