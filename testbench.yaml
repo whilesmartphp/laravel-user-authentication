@@ -1,14 +1,10 @@
 laravel: '@testbench'
 
 providers:
-   - Whilesmart\LaravelUserAuthentication\UserAuthenticationServiceProvider
-   - Workbench\App\Providers\WorkbenchServiceProvider
+  - Whilesmart\LaravelUserAuthentication\UserAuthenticationServiceProvider
 
 migrations:
   - workbench/database/migrations
-
-seeders:
-  - Workbench\Database\Seeders\DatabaseSeeder
 
 workbench:
   start: '/'
@@ -16,9 +12,10 @@ workbench:
   health: false
   discovers:
     web: true
-    api: false
-    commands: false
+    api: true
+    commands: true
     components: false
+    factories: true
     views: false
   build:
     - asset-publish
