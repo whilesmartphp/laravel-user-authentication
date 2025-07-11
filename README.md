@@ -33,14 +33,14 @@ the migrations, routes, controllers separately or all at once.
 Run the command below to publish only the routes.
 
 ```bash
-php artisan vendor:publish --tag=user-authentication-routes
+php artisan vendor:publish --tag=laravel-user-authentication-routes
 php artisan migrate
 ```
 
-The routes will be available at `routes/user-authentication.php`. You should `require` this file in your `api.php` file.
+The routes will be available at `routes/laravel-user-authentication.php`. You should `require` this file in your `api.php` file.
 
 ```php
-    require 'user-authentication.php';
+    require 'laravel-user-authentication.php';
 ```
 
 #### 2.2 Publishing only the migrations
@@ -48,7 +48,7 @@ The routes will be available at `routes/user-authentication.php`. You should `re
 +If you would like to make changes to the migration files, run the command below to publish only the migrations.
 
 ```bash
-php artisan vendor:publish --tag=user-authentication-migrations
+php artisan vendor:publish --tag=laravel-user-authentication-migrations
 php artisan migrate
 ```
 
@@ -59,7 +59,7 @@ The migrations will be available in the `database/migrations` folder.
 To publish the controllers, run the command below
 
 ```bash
-php artisan vendor:publish --tag=user-authentication-controllers
+php artisan vendor:publish --tag=laravel-user-authentication-controllers
 php artisan migrate
 ```
 The controllers will be available in the `app/Http/Controllers/Api/Auth` directory.
@@ -72,7 +72,7 @@ Finally,  change the namespace in the published controllers to your namespace.
 To publish the migrations, routes and controllers, you can run the command below
 
 ```bash
-php artisan vendor:publish --tag=user-authentication
+php artisan vendor:publish --tag=laravel-user-authentication
 php artisan migrate
 ```
 #### Note: See section 2.1 above to make the routes accessible
@@ -114,11 +114,11 @@ PasswordResetCodeGeneratedEvent::dispatch($email, $verificationCode);
 
 After installation, the following API endpoints will be available:
 
-* **POST /api/register:** Register a new user.
-* **POST /api/login:** Log in an existing user.
-* **POST /api/logout:** Logs out an existing user.
-* **POST /api/password/forgot:** Request a password reset.
-* **POST /api/password/reset:** Reset a password.
+* **POST /register:** Register a new user.
+* **POST /login:** Log in an existing user.
+* **POST /logout:** Logs out an existing user.
+* **POST /password/forgot:** Request a password reset.
+* **POST /password/reset:** Reset a password.
 * **OpenAPI Documentation:** Accessible via a route that your OpenAPI package defines.
 
 **Example Registration Request:**
