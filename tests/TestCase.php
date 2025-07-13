@@ -30,7 +30,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
     public function test_api_user_can_register_successfully()
     {
         $faker = Factory::create();
-        $response = $this->postJson('/register', [
+        $response = $this->postJson('/api/register', [
             'email' => $faker->unique()->safeEmail,
             'first_name' => $faker->firstName,
             'last_name' => $faker->lastName,
@@ -54,7 +54,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
 
     public function test_api_user_receives_register_validation_error_when_required_fields_are_missing()
     {
-        $response = $this->postJson('/register', []);
+        $response = $this->postJson('/api/register', []);
 
         $response->assertStatus(422)
             ->assertJson([
@@ -74,7 +74,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
     {
         $user = $this->createUser();
 
-        $response = $this->postJson('/login', [
+        $response = $this->postJson('/api/login', [
             'email' => $user->email,
             'password' => 'password123',
         ]);
@@ -93,7 +93,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
     public function test_api_user_can_login_successfully_with_username()
     {
         $faker = Factory::create();
-        $response = $this->postJson('/register', [
+        $response = $this->postJson('/api/register', [
             'username' => 'testuser',
             'password' => 'password123',
             'first_name' => 'John',
@@ -103,7 +103,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
 
         $response->assertStatus(201);
 
-        $response = $this->postJson('/login', [
+        $response = $this->postJson('/api/login', [
             'username' => 'testuser',
             'password' => 'password123',
         ]);
@@ -122,7 +122,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
     public function test_api_user_can_login_successfully_with_phone()
     {
         $faker = Factory::create();
-        $response = $this->postJson('/register', [
+        $response = $this->postJson('/api/register', [
             'phone' => '1234567890',
             'password' => 'password123',
             'first_name' => 'John',
@@ -132,7 +132,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
 
         $response->assertStatus(201);
 
-        $response = $this->postJson('/login', [
+        $response = $this->postJson('/api/login', [
             'phone' => '1234567890',
             'password' => 'password123',
         ]);
@@ -152,7 +152,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
     {
         $user = $this->createUser();
 
-        $response = $this->postJson('/login', [
+        $response = $this->postJson('/api/login', [
             'email' => $user->email,
             'password' => 'wrongpassword',
         ]);
@@ -167,7 +167,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
     public function test_api_user_login_failed_with_unregistered_user()
     {
         $faker = Factory::create();
-        $response = $this->postJson('/login', [
+        $response = $this->postJson('/api/login', [
             'email' => $faker->unique()->safeEmail,
             'password' => 'password123',
         ]);
@@ -181,7 +181,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
 
     public function test_api_user_receives_login_validation_error_when_required_fields_are_missing()
     {
-        $response = $this->postJson('/login', []);
+        $response = $this->postJson('/api/login', []);
 
         $response->assertStatus(422)
             ->assertJson([
@@ -204,7 +204,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
 
         $user = $this->createUser();
 
-        $response = $this->postJson('/password/reset-code', ['email' => $user->email]);
+        $response = $this->postJson('/api/password/reset-code', ['email' => $user->email]);
 
         $response->assertStatus(200)
             ->assertJson(['message' => 'If this email matches a record, a password reset code has been sent.']);
@@ -217,10 +217,10 @@ class TestCase extends \Orchestra\Testbench\TestCase
         $user = $this->createUser();
 
         for ($i = 0; $i < 6; $i++) {
-            $this->postJson('/password/reset-code', ['email' => $user->email]);
+            $this->postJson('/api/password/reset-code', ['email' => $user->email]);
         }
 
-        $response = $this->postJson('/password/reset-code', ['email' => $user->email]);
+        $response = $this->postJson('/api/password/reset-code', ['email' => $user->email]);
 
         $response->assertStatus(429)
             ->assertJson(['message' => 'Too many attempts, please try again later.']);
@@ -240,7 +240,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
             'expires_at' => now()->addMinutes(15),
         ]);
 
-        $response = $this->postJson('/password/reset', [
+        $response = $this->postJson('/api/password/reset', [
             'email' => $user->email,
             'code' => $verificationCode,
             'new_password' => 'newpassword123',
@@ -257,7 +257,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
     {
         $user = $this->createUser();
 
-        $response = $this->postJson('/password/reset', [
+        $response = $this->postJson('/api/password/reset', [
             'email' => $user->email,
             'code' => 123456,
             'new_password' => 'newpassword123',
