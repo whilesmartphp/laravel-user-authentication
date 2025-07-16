@@ -29,23 +29,30 @@ class UserAuthenticationServiceProvider extends ServiceProvider
 
         $this->publishesMigrations([
             __DIR__.'/../database/migrations' => database_path('migrations'),
-        ], ['user-authentication', 'user-authentication-migrations']);
+        ], ['laravel-user-authentication', 'laravel-user-authentication-migrations']);
 
-        Route::prefix('api')->group(function () {
-            $this->loadRoutesFrom(__DIR__.'/../routes/user-authentication.php');
-        });
+        if (config('laravel-user-authentication.register_routes', true)) {
+            $prefix = config('laravel-user-authentication.route_prefix', 'api');
+            if ($prefix) {
+                Route::prefix($prefix)->group(function () {
+                    $this->loadRoutesFrom(__DIR__.'/../routes/laravel-user-authentication.php');
+                });
+            } else {
+                $this->loadRoutesFrom(__DIR__.'/../routes/laravel-user-authentication.php');
+            }
+        }
 
         $this->publishes([
-            __DIR__.'/../routes/user-authentication.php' => base_path('routes/user-authentication.php'),
-        ], ['user-authentication', 'user-authentication-routes', 'user-authentication-controllers']);
+            __DIR__.'/../routes/laravel-user-authentication.php' => base_path('routes/laravel-user-authentication.php'),
+        ], ['laravel-user-authentication', 'laravel-user-authentication-routes', 'laravel-user-authentication-controllers']);
 
         $this->publishes([
             __DIR__.'/Http/Controllers' => app_path('Http/Controllers/Api'),
-        ], ['user-authentication', 'user-authentication-controllers']);
+        ], ['laravel-user-authentication', 'laravel-user-authentication-controllers']);
 
         // Publish config
         $this->publishes([
-            __DIR__.'/../config/user-authentication.php' => config_path('user-authentication.php'),
-        ], ['user-authentication', 'user-authentication-controllers']);
+            __DIR__.'/../config/laravel-user-authentication.php' => config_path('laravel-user-authentication.php'),
+        ], ['laravel-user-authentication', 'laravel-user-authentication-config']);
     }
 }

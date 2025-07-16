@@ -25,7 +25,8 @@ documentation, all ready to use out of the box.
 
 ### 2. Publish the configuration and migrations:
 
-You do not need to publish the migrations and configurations except if you want to make modifications. You can choose to publish
+You do not need to publish the migrations and configurations except if you want to make modifications. You can choose to
+publish
 the migrations, routes, controllers separately or all at once.
 
 #### 2.1 Publishing only the routes
@@ -33,14 +34,15 @@ the migrations, routes, controllers separately or all at once.
 Run the command below to publish only the routes.
 
 ```bash
-php artisan vendor:publish --tag=user-authentication-routes
+php artisan vendor:publish --tag=laravel-user-authentication-routes
 php artisan migrate
 ```
 
-The routes will be available at `routes/user-authentication.php`. You should `require` this file in your `api.php` file.
+The routes will be available at `routes/laravel-user-authentication.php`. You should `require` this file in your
+`api.php` file.
 
 ```php
-    require 'user-authentication.php';
+    require 'laravel-user-authentication.php';
 ```
 
 #### 2.2 Publishing only the migrations
@@ -48,7 +50,7 @@ The routes will be available at `routes/user-authentication.php`. You should `re
 +If you would like to make changes to the migration files, run the command below to publish only the migrations.
 
 ```bash
-php artisan vendor:publish --tag=user-authentication-migrations
+php artisan vendor:publish --tag=laravel-user-authentication-migrations
 php artisan migrate
 ```
 
@@ -59,26 +61,45 @@ The migrations will be available in the `database/migrations` folder.
 To publish the controllers, run the command below
 
 ```bash
-php artisan vendor:publish --tag=user-authentication-controllers
+php artisan vendor:publish --tag=laravel-user-authentication-controllers
 php artisan migrate
 ```
+
 The controllers will be available in the `app/Http/Controllers/Api/Auth` directory.
-Finally,  change the namespace in the published controllers to your namespace.
+Finally, change the namespace in the published controllers to your namespace.
 
 #### Note: Publishing the controllers will also publish the routes. See section 2.1
 
-#### 2.4 Publish everything
+#### 2.4 Publish  the config
 
-To publish the migrations, routes and controllers, you can run the command below
+To publish the config, run the command below
 
 ```bash
-php artisan vendor:publish --tag=user-authentication
+php artisan vendor:publish --tag=laravel-user-authentication-config
+```
+
+The config file will be available in the `config/laravel-user-authentication.php`.
+The config file has the folowing variables:
+
+- `register_routes`: Default `true`. Auto registers the routes. If you do not want to auto-register the routes, set the
+  value to `false
+- `route_prefix`: Default `api`. Defines the prefix for the auto-registered routes.
+
+#### 2.5 Publish everything
+
+To publish the migrations, config, routes, and controllers, you can run the command below
+
+```bash
+php artisan vendor:publish --tag=laravel-user-authentication
 php artisan migrate
 ```
+
 #### Note: See section 2.1 above to make the routes accessible
 
 ### 3. Updates to the User model
+
 Add the following to the `$fillable` variable in your User model:
+
 ```php
 'first_name',
 'last_name',
@@ -86,26 +107,36 @@ Add the following to the `$fillable` variable in your User model:
 'phone'
 ```
 
-
 ### 5. **Events Emitted**
+
 This package emits the following events:
+
 1. **UserRegisteredEvent:** This event is emitted after a user successfully registers
+
 ```php
 UserRegisteredEvent::dispatch($user);
 ```
+
 2. **UserLoggedInEvent:**: This event is emitted after a user successfully logs in
+
 ```php
 UserLoggedInEvent::dispatch($user);
 ```
+
 3. **UserLoggedOutEvent:** This event is emitted after a user successfully logs out
+
 ```php
 UserLoggedOutEvent::dispatch($user);
 ```
+
 4. **PasswordResetCompleteEvent:** This event is emitted after a user successfully reset their password
+
 ```php
 PasswordResetCompleteEvent::dispatch($user);
 ```
+
 5. **PasswordResetCodeGeneratedEvent:** This event is emitted after a user requests to reset their password
+
 ```php
 PasswordResetCodeGeneratedEvent::dispatch($email, $verificationCode);
 ```
