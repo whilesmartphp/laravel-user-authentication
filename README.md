@@ -38,11 +38,11 @@ php artisan vendor:publish --tag=laravel-user-authentication-routes
 php artisan migrate
 ```
 
-The routes will be available at `routes/laravel-user-authentication.php`. You should `require` this file in your
+The routes will be available at `routes/user-authentication.php`. You should `require` this file in your
 `api.php` file.
 
 ```php
-    require 'laravel-user-authentication.php';
+    require 'user-authentication.php';
 ```
 
 #### 2.2 Publishing only the migrations
@@ -78,7 +78,7 @@ To publish the config, run the command below
 php artisan vendor:publish --tag=laravel-user-authentication-config
 ```
 
-The config file will be available in the `config/laravel-user-authentication.php`.
+The config file will be available in the `config/user-authentication.php`.
 The config file has the folowing variables:
 
 - `register_routes`: Default `true`. Auto registers the routes. If you do not want to auto-register the routes, set the

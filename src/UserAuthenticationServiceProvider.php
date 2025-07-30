@@ -31,19 +31,19 @@ class UserAuthenticationServiceProvider extends ServiceProvider
             __DIR__.'/../database/migrations' => database_path('migrations'),
         ], ['laravel-user-authentication', 'laravel-user-authentication-migrations']);
 
-        if (config('laravel-user-authentication.register_routes', true)) {
-            $prefix = config('laravel-user-authentication.route_prefix', 'api');
+        if (config('user-authentication.register_routes', true)) {
+            $prefix = config('user-authentication.route_prefix', 'api');
             if ($prefix) {
                 Route::prefix($prefix)->group(function () {
-                    $this->loadRoutesFrom(__DIR__.'/../routes/laravel-user-authentication.php');
+                    $this->loadRoutesFrom(__DIR__.'/../routes/user-authentication.php');
                 });
             } else {
-                $this->loadRoutesFrom(__DIR__.'/../routes/laravel-user-authentication.php');
+                $this->loadRoutesFrom(__DIR__.'/../routes/user-authentication.php');
             }
         }
 
         $this->publishes([
-            __DIR__.'/../routes/laravel-user-authentication.php' => base_path('routes/laravel-user-authentication.php'),
+            __DIR__.'/../routes/user-authentication.php' => base_path('routes/user-authentication.php'),
         ], ['laravel-user-authentication', 'laravel-user-authentication-routes', 'laravel-user-authentication-controllers']);
 
         $this->publishes([
@@ -52,7 +52,7 @@ class UserAuthenticationServiceProvider extends ServiceProvider
 
         // Publish config
         $this->publishes([
-            __DIR__.'/../config/laravel-user-authentication.php' => config_path('laravel-user-authentication.php'),
+            __DIR__.'/../config/user-authentication.php' => config_path('user-authentication.php'),
         ], ['laravel-user-authentication', 'laravel-user-authentication-config']);
     }
 }
