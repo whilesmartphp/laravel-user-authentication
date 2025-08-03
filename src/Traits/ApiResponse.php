@@ -1,6 +1,6 @@
 <?php
 
-namespace Whilesmart\LaravelUserAuthentication\Traits;
+namespace Whilesmart\UserAuthentication\Traits;
 
 use Illuminate\Http\JsonResponse;
 

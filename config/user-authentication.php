@@ -1,9 +1,8 @@
 <?php
 
-use App\Models\User;
-
 return [
-    'app_model' => User::class,
+    'user_model' => Whilesmart\UserAuthentication\Models\User::class,
     'register_routes' => true,
+    'register_oauth_routes' => true,
     'route_prefix' => 'api',
 ];

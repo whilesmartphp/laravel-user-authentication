@@ -1,6 +1,6 @@
 <?php
 
-namespace Whilesmart\LaravelUserAuthentication;
+namespace Whilesmart\UserAuthentication;
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -39,6 +39,16 @@ class UserAuthenticationServiceProvider extends ServiceProvider
                 });
             } else {
                 $this->loadRoutesFrom(__DIR__.'/../routes/user-authentication.php');
+            }
+        }
+        if (config('user-authentication.register_oauth_routes', true)) {
+            $prefix = config('user-authentication.route_prefix', 'api');
+            if ($prefix) {
+                Route::prefix($prefix)->group(function () {
+                    $this->loadRoutesFrom(__DIR__.'/../routes/social-login.php');
+                });
+            } else {
+                $this->loadRoutesFrom(__DIR__.'/../routes/social-login.php');
             }
         }
 

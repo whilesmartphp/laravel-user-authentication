@@ -79,9 +79,12 @@ php artisan vendor:publish --tag=laravel-user-authentication-config
 ```
 
 The config file will be available in the `config/user-authentication.php`.
-The config file has the folowing variables:
+The config file has the following variables:
 
 - `register_routes`: Default `true`. Auto registers the routes. If you do not want to auto-register the routes, set the
+  value to `false
+- `register_oauth_routes`: Default `true`. Auto registers the oauth routes. If you do not want to auto-register the
+  oauth routes, set the
   value to `false
 - `route_prefix`: Default `api`. Defines the prefix for the auto-registered routes.
 
@@ -96,7 +99,12 @@ php artisan migrate
 
 #### Note: See section 2.1 above to make the routes accessible
 
-### 3. Updates to the User model
+### 3. Oauth Configuration
+
+This package uses `laravel/socialite` for oauth. Please refer to
+the [Socialite Documentation](https://laravel.com/docs/12.x/socialite) if your application requires oauth.
+
+### 4. Updates to the User model
 
 Add the following to the `$fillable` variable in your User model:
 
@@ -150,6 +158,8 @@ After installation, the following API endpoints will be available:
 * **POST /api/logout:** Logs out an existing user.
 * **POST /api/password/forgot:** Request a password reset.
 * **POST /api/password/reset:** Reset a password.
+* **GET /api/oauth/{provider}/login:** Initiate oauth login.
+* **GET /api/oauth/{provider}/callback:** Oauth login callback.
 * **OpenAPI Documentation:** Accessible via a route that your OpenAPI package defines.
 
 **Example Registration Request:**

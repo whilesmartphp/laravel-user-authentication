@@ -1,6 +1,6 @@
 <?php
 
-namespace Whilesmart\LaravelUserAuthentication\Events;
+namespace Whilesmart\UserAuthentication\Events;
 
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Auth\Authenticatable;

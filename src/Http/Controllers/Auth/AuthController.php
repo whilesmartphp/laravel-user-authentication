@@ -1,19 +1,22 @@
 <?php
 
-namespace Whilesmart\LaravelUserAuthentication\Http\Controllers\Auth;
+namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Laravel\Socialite\Facades\Socialite;
 use OpenApi\Attributes as OA;
-use Whilesmart\LaravelUserAuthentication\Events\UserLoggedInEvent;
-use Whilesmart\LaravelUserAuthentication\Events\UserLoggedOutEvent;
-use Whilesmart\LaravelUserAuthentication\Events\UserRegisteredEvent;
-use Whilesmart\LaravelUserAuthentication\Models\User;
-use Whilesmart\LaravelUserAuthentication\Traits\ApiResponse;
-use Whilesmart\LaravelUserAuthentication\Traits\Loggable;
+use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
+use Whilesmart\UserAuthentication\Events\UserLoggedOutEvent;
+use Whilesmart\UserAuthentication\Events\UserRegisteredEvent;
+use Whilesmart\UserAuthentication\Models\OauthAccount;
+use Whilesmart\UserAuthentication\Models\User;
+use Whilesmart\UserAuthentication\Traits\ApiResponse;
+use Whilesmart\UserAuthentication\Traits\Loggable;
 
 #[OA\Tag(name: 'Authentication', description: 'Endpoints for user authentication')]
 class AuthController extends Controller
@@ -63,7 +66,8 @@ class AuthController extends Controller
             $user_data = $request->only(['first_name', 'last_name', 'email', 'password', 'phone', 'username']);
             $user_data['password'] = Hash::make($request->password);
 
-            $user = User::create($user_data);
+            $User = config('user-authentication.user_model', User::class);
+            $user = $User::create($user_data);
             UserRegisteredEvent::dispatch($user);
             $this->info("New user with email $request->email just registered ");
 
@@ -125,7 +129,10 @@ class AuthController extends Controller
         ];
 
         try {
-            $user = User::where($identifier_field, $credentials[$identifier_field])->first();
+            /* @var $User \Illuminate\Auth\Authenticatable */
+            $User = config('user-authentication.user_model', User::class);
+
+            $user = $User::where($identifier_field, $credentials[$identifier_field])->first();
 
             if (! $user || ! auth()->attempt($credentials)) {
                 return $this->failure('Invalid credentials', 401);
@@ -165,5 +172,69 @@ class AuthController extends Controller
         UserLoggedOutEvent::dispatch($user);
 
         return $this->success([], 'User has been logged out successfully');
+    }
+
+    #[OA\Get(
+        path: '/oauth/{driver}/login',
+        summary: 'Get Oauth redirect URI',
+        tags: ['Authentication'],
+        responses: [
+            new OA\Response(response: 200, description: 'URL generated'),
+            new OA\Response(response: 500, description: 'Server error'),
+        ]
+    )]
+    public function oauthLogin(Request $request, $driver): JsonResponse
+    {
+        $url = Socialite::driver($driver)->stateless()->redirect()->getTargetUrl();
+
+        return $this->success([
+            'url' => $url,
+            'message' => 'oauth login redirection url',
+        ]);
+    }
+
+    #[OA\Get(
+        path: '/oauth/{driver}/callback',
+        summary: 'Handles Oauth login callback',
+        tags: ['Authentication'],
+        responses: [
+            new OA\Response(response: 200, description: ' '),
+            new OA\Response(response: 500, description: 'Server error'),
+        ]
+    )]
+    public function oauthCallback(Request $request, $driver): JsonResponse
+    {
+        $social_user = Socialite::driver($driver)->stateless()->user();
+        $email = $social_user->getEmail();
+        $name = $social_user->getName();
+
+        if (empty($name) || empty($email)) {
+            return $this->failure('Your app must request the name and email of the user', 400);
+        }
+
+        $User = config('user-authentication.user_model', User::class);
+        $existing_user = $User::where('email', $email)->first();
+        if ($existing_user) {
+            UserLoggedInEvent::dispatch($existing_user);
+            $this->info("User with email $email just logged in via social auth ");
+        } else {
+            $user_data = ['first_name' => $name, 'email' => $email, 'password' => Hash::make(Str::random(10))];
+            $existing_user = $User::create($user_data);
+            UserRegisteredEvent::dispatch($existing_user);
+            $this->info("New user with email $email just registered via social auth ");
+        }
+
+        OauthAccount::firstOrCreate([
+            'user_id' => $existing_user->id,
+            'provider' => $driver,
+        ]);
+
+        $response = [
+            'user' => $existing_user,
+            'token' => $existing_user->createToken('auth-token')->plainTextToken,
+        ];
+
+        return $this->success($response, 'User authenticated successfully', 200);
+
     }
 }

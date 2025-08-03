@@ -10,13 +10,13 @@
     ],
     "autoload": {
         "psr-4": {
-            "Whilesmart\\LaravelUserAuthentication\\": "src"
+            "Whilesmart\\UserAuthentication\\": "src"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Whilesmart\\LaravelUserAuthentication\\UserAuthenticationServiceProvider"
+                "Whilesmart\\UserAuthentication\\UserAuthenticationServiceProvider"
             ]
         }
     },
@@ -28,7 +28,8 @@
         "fakerphp/faker": "^1.24"
     },
     "require": {
-        "laravel/sanctum": "^4.1"
+        "laravel/sanctum": "^4.1",
+        "laravel/socialite": "^5.23"
     },
     "autoload-dev": {
         "psr-4": {
