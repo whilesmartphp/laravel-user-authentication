@@ -1,6 +1,6 @@
 <?php
 
-namespace Whilesmart\LaravelUserAuthentication\Models;
+namespace Whilesmart\UserAuthentication\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;

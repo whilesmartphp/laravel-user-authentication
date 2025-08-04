@@ -1,7 +1,7 @@
 laravel: '@testbench'
 
 providers:
-  - Whilesmart\LaravelUserAuthentication\UserAuthenticationServiceProvider
+  - Whilesmart\UserAuthentication\UserAuthenticationServiceProvider
 
 migrations:
   - workbench/database/migrations

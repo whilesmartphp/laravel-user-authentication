@@ -5,10 +5,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Orchestra\Testbench\Attributes\WithMigration;
-use Whilesmart\LaravelUserAuthentication\Events\PasswordResetCodeGeneratedEvent;
-use Whilesmart\LaravelUserAuthentication\Events\PasswordResetCompleteEvent;
-use Whilesmart\LaravelUserAuthentication\Models\User;
-use Whilesmart\LaravelUserAuthentication\Models\VerificationCode;
+use Whilesmart\UserAuthentication\Events\PasswordResetCodeGeneratedEvent;
+use Whilesmart\UserAuthentication\Events\PasswordResetCompleteEvent;
+use Whilesmart\UserAuthentication\Models\User;
+use Whilesmart\UserAuthentication\Models\VerificationCode;
 
 use function Orchestra\Testbench\workbench_path;
 
@@ -289,7 +289,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
     protected function getPackageProviders($app)
     {
         return [
-            'Whilesmart\LaravelUserAuthentication\UserAuthenticationServiceProvider',
+            'Whilesmart\UserAuthentication\UserAuthenticationServiceProvider',
         ];
     }
 }

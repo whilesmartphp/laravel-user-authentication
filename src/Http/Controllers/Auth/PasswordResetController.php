@@ -1,6 +1,6 @@
 <?php
 
-namespace Whilesmart\LaravelUserAuthentication\Http\Controllers\Auth;
+namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -9,12 +9,12 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
-use Whilesmart\LaravelUserAuthentication\Events\PasswordResetCodeGeneratedEvent;
-use Whilesmart\LaravelUserAuthentication\Events\PasswordResetCompleteEvent;
-use Whilesmart\LaravelUserAuthentication\Models\User;
-use Whilesmart\LaravelUserAuthentication\Models\VerificationCode;
-use Whilesmart\LaravelUserAuthentication\Traits\ApiResponse;
-use Whilesmart\LaravelUserAuthentication\Traits\Loggable;
+use Whilesmart\UserAuthentication\Events\PasswordResetCodeGeneratedEvent;
+use Whilesmart\UserAuthentication\Events\PasswordResetCompleteEvent;
+use Whilesmart\UserAuthentication\Models\User;
+use Whilesmart\UserAuthentication\Models\VerificationCode;
+use Whilesmart\UserAuthentication\Traits\ApiResponse;
+use Whilesmart\UserAuthentication\Traits\Loggable;
 
 #[OA\Tag(name: 'Authentication', description: 'Endpoints for password reset')]
 class PasswordResetController extends Controller
