@@ -3,6 +3,7 @@
 namespace Whilesmart\UserAuthentication\Traits;
 
 use Illuminate\Http\JsonResponse;
+use Whilesmart\UserAuthentication\Interfaces\ResponseFormatterInterface;
 
 trait ApiResponse
 {
@@ -11,11 +12,7 @@ trait ApiResponse
      */
     protected function success(mixed $data = null, string $message = 'Operation successful', int $statusCode = 200): JsonResponse
     {
-        return response()->json([
-            'success' => true,
-            'message' => $message,
-            'data' => $data,
-        ], $statusCode);
+        return app(ResponseFormatterInterface::class)->success($data, $message, $statusCode);
     }
 
     /**
@@ -23,10 +20,6 @@ trait ApiResponse
      */
     protected function failure(string $message = 'Operation failed', int $statusCode = 400, array $errors = []): JsonResponse
     {
-        return response()->json([
-            'success' => false,
-            'message' => $message,
-            'errors' => $errors,
-        ], $statusCode);
+        return app(ResponseFormatterInterface::class)->failure($message, $statusCode, $errors);
     }
 }

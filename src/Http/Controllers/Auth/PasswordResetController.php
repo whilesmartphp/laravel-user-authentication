@@ -9,17 +9,19 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
+use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\PasswordResetCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Events\PasswordResetCompleteEvent;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
+use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
 
 #[OA\Tag(name: 'Authentication', description: 'Endpoints for password reset')]
 class PasswordResetController extends Controller
 {
-    use ApiResponse, Loggable;
+    use ApiResponse, HasMiddlewareHooks, Loggable;
 
     #[OA\Post(
         path: '/password/reset-code',
@@ -62,6 +64,8 @@ class PasswordResetController extends Controller
     )]
     public function sendPasswordResetCode(Request $request): JsonResponse
     {
+        $request = $this->runBeforeHooks($request, HookAction::PASSWORD_RESET_REQUEST);
+
         // Rate limiting
         if (RateLimiter::tooManyAttempts('password-reset:'.$request->ip(), 5)) {
             return $this->failure('Too many attempts, please try again later.', 429);
@@ -155,6 +159,7 @@ class PasswordResetController extends Controller
     )]
     public function resetPasswordWithCode(Request $request): JsonResponse
     {
+        $request = $this->runBeforeHooks($request, HookAction::PASSWORD_RESET);
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
             'code' => 'required|integer',
