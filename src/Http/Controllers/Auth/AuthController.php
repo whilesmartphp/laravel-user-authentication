@@ -10,18 +10,20 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use OpenApi\Attributes as OA;
+use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Events\UserLoggedOutEvent;
 use Whilesmart\UserAuthentication\Events\UserRegisteredEvent;
 use Whilesmart\UserAuthentication\Models\OauthAccount;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
+use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
 
 #[OA\Tag(name: 'Authentication', description: 'Endpoints for user authentication')]
 class AuthController extends Controller
 {
-    use ApiResponse, Loggable;
+    use ApiResponse, HasMiddlewareHooks, Loggable;
 
     #[OA\Post(
         path: '/register',
@@ -49,6 +51,8 @@ class AuthController extends Controller
     )]
     public function register(Request $request): JsonResponse
     {
+        $request = $this->runBeforeHooks($request, HookAction::REGISTER);
+
         try {
             $validator = Validator::make($request->all(), [
                 'email' => 'required|string|email|max:255|unique:users',
@@ -109,6 +113,7 @@ class AuthController extends Controller
     )]
     public function login(Request $request): JsonResponse
     {
+        $request = $this->runBeforeHooks($request, HookAction::LOGIN);
         $validator = Validator::make($request->all(), [
             'email' => 'required_without_all:phone,username|email',
             'phone' => 'required_without_all:email,username|string',
@@ -167,6 +172,8 @@ class AuthController extends Controller
     )]
     public function logout(Request $request): JsonResponse
     {
+        $request = $this->runBeforeHooks($request, HookAction::LOGOUT);
+
         $user = $request->user();
         $user->currentAccessToken()->delete();
         UserLoggedOutEvent::dispatch($user);
@@ -185,6 +192,8 @@ class AuthController extends Controller
     )]
     public function oauthLogin(Request $request, $driver): JsonResponse
     {
+        $request = $this->runBeforeHooks($request, HookAction::OAUTH_LOGIN);
+
         $url = Socialite::driver($driver)->stateless()->redirect()->getTargetUrl();
 
         return $this->success([
@@ -204,6 +213,8 @@ class AuthController extends Controller
     )]
     public function oauthCallback(Request $request, $driver): JsonResponse
     {
+        $request = $this->runBeforeHooks($request, HookAction::OAUTH_CALLBACK);
+
         $social_user = Socialite::driver($driver)->stateless()->user();
         $email = $social_user->getEmail();
         $name = $social_user->getName();

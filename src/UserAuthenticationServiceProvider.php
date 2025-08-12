@@ -14,7 +14,19 @@ class UserAuthenticationServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+        $this->mergeConfigFrom(
+            __DIR__.'/../config/user-authentication.php',
+            'user-authentication'
+        );
+
+        $this->app->bind(
+            \Whilesmart\UserAuthentication\Interfaces\ResponseFormatterInterface::class,
+            function ($app) {
+                $formatter = config('user-authentication.response_formatter');
+
+                return new $formatter;
+            }
+        );
     }
 
     /**
