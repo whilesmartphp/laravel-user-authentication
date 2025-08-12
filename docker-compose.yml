@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: tail -f /dev/null
+    environment:
+      - APP_ENV=testing
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: testing
+      MYSQL_USER: laravel
+      MYSQL_PASSWORD: laravel
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+
+
+volumes:
+  mysql_data:

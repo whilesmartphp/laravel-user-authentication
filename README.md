@@ -311,3 +311,46 @@ After installation, the following API endpoints will be available:
     "password": "password123",
     "password_confirmation": "password123"
 }
+```
+
+## Development Environment
+
+This package includes a minimal Docker setup for local development and testing.
+
+### Prerequisites
+
+*   Docker and Docker Compose installed on your system.
+
+### Setup
+
+1.  **Build and Start Containers:**
+    Navigate to the root of the package and run:
+
+    ```bash
+    docker-compose up --build -d
+    ```
+
+    This will build the `app` service (PHP environment) and start the `mysql` service.
+
+2.  **Install Composer Dependencies:**
+    Once the `app` container is running, execute Composer install within the container:
+
+    ```bash
+    docker-compose exec app composer install
+    ```
+
+3.  **Run Migrations:**
+    Run the database migrations to set up the necessary tables:
+
+    ```bash
+    docker-compose exec app vendor/bin/testbench migrate
+    ```
+
+### Usage
+
+You can now execute `testbench` commands or run tests within the `app` container:
+
+```bash
+docker-compose exec app vendor/bin/testbench package:test
+docker-compose exec app vendor/bin/testbench serve
+```
