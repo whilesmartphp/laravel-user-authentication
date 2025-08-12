@@ -64,7 +64,9 @@ class AuthController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return $this->failure('Validation failed.', 422, [$validator->errors()]);
+                $response = $this->failure('Validation failed.', 422, [$validator->errors()]);
+
+                return $this->runAfterHooks($request, $response, HookAction::REGISTER);
             }
 
             $user_data = $request->only(['first_name', 'last_name', 'email', 'password', 'phone', 'username']);
@@ -80,11 +82,15 @@ class AuthController extends Controller
                 'token' => $user->createToken('auth-token')->plainTextToken,
             ];
 
-            return $this->success($response, 'User registered successfully', 201);
+            $response = $this->success($response, 'User registered successfully', 201);
+
+            return $this->runAfterHooks($request, $response, HookAction::REGISTER);
         } catch (\Exception $e) {
             $this->error($e);
 
-            return $this->failure('An error occurred', 500);
+            $response = $this->failure('An error occurred', 500);
+
+            return $this->runAfterHooks($request, $response, HookAction::REGISTER);
         }
     }
 
@@ -122,7 +128,9 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return $this->failure('Validation failed.', 422, [$validator->errors()]);
+            $response = $this->failure('Validation failed.', 422, [$validator->errors()]);
+
+            return $this->runAfterHooks($request, $response, HookAction::LOGIN);
         }
 
         $identifier_field = $request->has('email') ? 'email'
@@ -140,20 +148,26 @@ class AuthController extends Controller
             $user = $User::where($identifier_field, $credentials[$identifier_field])->first();
 
             if (! $user || ! auth()->attempt($credentials)) {
-                return $this->failure('Invalid credentials', 401);
+                $response = $this->failure('Invalid credentials', 401);
+
+                return $this->runAfterHooks($request, $response, HookAction::LOGIN);
             }
 
             UserLoggedInEvent::dispatch($user);
 
-            return $this->success([
+            $response = $this->success([
                 'token' => $user->createToken('auth-token')->plainTextToken,
                 'token_type' => 'Bearer',
                 'user' => auth()->user(),
             ], 'User successfully logged in', 200);
+
+            return $this->runAfterHooks($request, $response, HookAction::LOGIN);
         } catch (\Exception $e) {
             $this->error('An error occurred during login: '.$e->getMessage(), ['exception' => $e]);
 
-            return $this->failure('An error occurred during login', 500);
+            $response = $this->failure('An error occurred during login', 500);
+
+            return $this->runAfterHooks($request, $response, HookAction::LOGIN);
         }
     }
 
@@ -178,7 +192,9 @@ class AuthController extends Controller
         $user->currentAccessToken()->delete();
         UserLoggedOutEvent::dispatch($user);
 
-        return $this->success([], 'User has been logged out successfully');
+        $response = $this->success([], 'User has been logged out successfully');
+
+        return $this->runAfterHooks($request, $response, HookAction::LOGOUT);
     }
 
     #[OA\Get(
@@ -196,10 +212,12 @@ class AuthController extends Controller
 
         $url = Socialite::driver($driver)->stateless()->redirect()->getTargetUrl();
 
-        return $this->success([
+        $response = $this->success([
             'url' => $url,
             'message' => 'oauth login redirection url',
         ]);
+
+        return $this->runAfterHooks($request, $response, HookAction::OAUTH_LOGIN);
     }
 
     #[OA\Get(
@@ -220,7 +238,9 @@ class AuthController extends Controller
         $name = $social_user->getName();
 
         if (empty($name) || empty($email)) {
-            return $this->failure('Your app must request the name and email of the user', 400);
+            $response = $this->failure('Your app must request the name and email of the user', 400);
+
+            return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
         }
 
         $User = config('user-authentication.user_model', User::class);
@@ -245,7 +265,9 @@ class AuthController extends Controller
             'token' => $existing_user->createToken('auth-token')->plainTextToken,
         ];
 
-        return $this->success($response, 'User authenticated successfully', 200);
+        $response = $this->success($response, 'User authenticated successfully', 200);
+
+        return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
 
     }
 }
