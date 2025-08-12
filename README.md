@@ -269,6 +269,27 @@ $this->runBeforeHooks($request, 'myCustomAction');
 
             return $request; // Always return the request
         }
+
+        public function after(Request $request, JsonResponse $response, string $action): JsonResponse
+        {
+            // Perform actions after the main controller logic and before the response is sent.
+            // The $action parameter will contain the string value of the action.
+
+            // Example: Modify the response based on the action
+            switch ($action) {
+                case HookAction::LOGIN->value:
+                    \Log::info("User successfully logged in. Response status: " . $response->getStatusCode());
+                    break;
+                case HookAction::REGISTER->value:
+                    \Log::info("User registered. Response status: " . $response->getStatusCode());
+                    break;
+            }
+
+            // For example, logging, adding headers, or modifying the response content.
+            \Log::info("After {$action} action. Response status: " . $response->getStatusCode());
+
+            return $response; // Always return the response
+        }
     }
     ```
 
