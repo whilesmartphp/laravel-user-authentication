@@ -9,7 +9,7 @@ class VerificationCode extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['contact', 'code', 'purpose', 'expires_at'];
+    protected $fillable = ['contact', 'code', 'purpose', 'expires_at', 'verified_at'];
 
     public $timestamps = true;
 

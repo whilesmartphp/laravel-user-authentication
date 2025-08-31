@@ -11,6 +11,8 @@ enum HookAction: string
     case OAUTH_CALLBACK = 'oauthCallback';
     case PASSWORD_RESET_REQUEST = 'passwordResetRequest';
     case PASSWORD_RESET = 'passwordReset';
+    case SEND_VERIFICATION_CODE = 'sendVerificationCode';
+    case VERIFY_CODE = 'verifyCode';
 
     /**
      * Get all predefined hook actions.
