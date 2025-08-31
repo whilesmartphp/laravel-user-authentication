@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Hash;
 use Orchestra\Testbench\Attributes\WithMigration;
 use Whilesmart\UserAuthentication\Events\PasswordResetCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Events\PasswordResetCompleteEvent;
+use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
 
@@ -266,6 +267,341 @@ class TestCase extends \Orchestra\Testbench\TestCase
 
         $response->assertStatus(400)
             ->assertJson(['message' => 'Invalid or expired code.']);
+    }
+
+    public function test_send_verification_code_successfully()
+    {
+        Event::fake();
+
+        $faker = Factory::create();
+        $email = $faker->unique()->safeEmail;
+
+        $response = $this->postJson('/api/send-verification-code', [
+            'contact' => $email,
+            'type' => 'email',
+            'purpose' => 'registration',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['message' => 'Verification code sent to your email.']);
+
+        Event::assertDispatched(VerificationCodeGeneratedEvent::class, function ($event) use ($email) {
+            return $event->contact === $email
+                && $event->type === 'email'
+                && $event->purpose === 'registration_email';
+        });
+
+        $this->assertDatabaseHas('verification_codes', [
+            'contact' => $email,
+            'purpose' => 'registration_email',
+        ]);
+    }
+
+    public function test_send_verification_code_phone_successfully()
+    {
+        Event::fake();
+
+        $phone = '+1234567890';
+
+        $response = $this->postJson('/api/send-verification-code', [
+            'contact' => $phone,
+            'type' => 'phone',
+            'purpose' => 'registration',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['message' => 'Verification code sent to your phone.']);
+
+        Event::assertDispatched(VerificationCodeGeneratedEvent::class, function ($event) use ($phone) {
+            return $event->contact === $phone
+                && $event->type === 'phone'
+                && $event->purpose === 'registration_phone';
+        });
+
+        $this->assertDatabaseHas('verification_codes', [
+            'contact' => $phone,
+            'purpose' => 'registration_phone',
+        ]);
+    }
+
+    public function test_send_verification_code_validation_error()
+    {
+        $response = $this->postJson('/api/send-verification-code', []);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Validation failed.',
+            ]);
+    }
+
+    public function test_send_verification_code_rate_limit()
+    {
+        $faker = Factory::create();
+        $email = $faker->unique()->safeEmail;
+
+        for ($i = 0; $i < 6; $i++) {
+            $this->postJson('/api/send-verification-code', [
+                'contact' => $email,
+                'type' => 'email',
+                'purpose' => 'registration',
+            ]);
+        }
+
+        $response = $this->postJson('/api/send-verification-code', [
+            'contact' => $email,
+            'type' => 'email',
+            'purpose' => 'registration',
+        ]);
+
+        $response->assertStatus(429)
+            ->assertJson(['message' => 'Too many attempts, please try again later.']);
+    }
+
+    public function test_verify_code_successfully()
+    {
+        $faker = Factory::create();
+        $email = $faker->unique()->safeEmail;
+        $verificationCode = random_int(100000, 999999);
+
+        VerificationCode::create([
+            'contact' => $email,
+            'code' => Hash::make($verificationCode),
+            'purpose' => 'registration_email',
+            'expires_at' => now()->addMinutes(5),
+        ]);
+
+        $response = $this->postJson('/api/verify-code', [
+            'contact' => $email,
+            'code' => (string) $verificationCode,
+            'type' => 'email',
+            'purpose' => 'registration',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['message' => 'Code verified successfully.']);
+
+        $this->assertDatabaseHas('verification_codes', [
+            'contact' => $email,
+            'purpose' => 'registration_email',
+        ]);
+    }
+
+    public function test_verify_code_invalid_code()
+    {
+        $faker = Factory::create();
+        $email = $faker->unique()->safeEmail;
+        $verificationCode = random_int(100000, 999999);
+        $wrongCode = random_int(100000, 999999);
+
+        while ($wrongCode === $verificationCode) {
+            $wrongCode = random_int(100000, 999999);
+        }
+
+        VerificationCode::create([
+            'contact' => $email,
+            'code' => Hash::make($verificationCode),
+            'purpose' => 'registration_email',
+            'expires_at' => now()->addMinutes(5),
+        ]);
+
+        $response = $this->postJson('/api/verify-code', [
+            'contact' => $email,
+            'code' => (string) $wrongCode,
+            'type' => 'email',
+            'purpose' => 'registration',
+        ]);
+
+        $response->assertStatus(400)
+            ->assertJson(['message' => 'Invalid or expired code.']);
+    }
+
+    public function test_verify_code_expired_code()
+    {
+        $faker = Factory::create();
+        $email = $faker->unique()->safeEmail;
+        $verificationCode = random_int(100000, 999999);
+
+        VerificationCode::create([
+            'contact' => $email,
+            'code' => Hash::make($verificationCode),
+            'purpose' => 'registration_email',
+            'expires_at' => now()->subMinutes(1),
+        ]);
+
+        $response = $this->postJson('/api/verify-code', [
+            'contact' => $email,
+            'code' => (string) $verificationCode,
+            'type' => 'email',
+            'purpose' => 'registration',
+        ]);
+
+        $response->assertStatus(400)
+            ->assertJson(['message' => 'Invalid or expired code.']);
+    }
+
+    public function test_verify_code_no_code_found()
+    {
+        $faker = Factory::create();
+        $email = $faker->unique()->safeEmail;
+
+        $response = $this->postJson('/api/verify-code', [
+            'contact' => $email,
+            'code' => '123456',
+            'type' => 'email',
+            'purpose' => 'registration',
+        ]);
+
+        $response->assertStatus(400)
+            ->assertJson(['message' => 'Invalid or expired code.']);
+    }
+
+    public function test_verify_code_validation_error()
+    {
+        $response = $this->postJson('/api/verify-code', []);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Validation failed.',
+            ]);
+    }
+
+    public function test_register_without_verification_enabled()
+    {
+        $faker = Factory::create();
+        $response = $this->postJson('/api/register', [
+            'email' => $faker->unique()->safeEmail,
+            'first_name' => $faker->firstName,
+            'last_name' => $faker->lastName,
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'user',
+                    'token',
+                ],
+                'message',
+            ]);
+
+        $this->assertDatabaseHas('users', ['email' => $response->json('data.user.email')]);
+    }
+
+    public function test_register_with_email_verification_enabled_but_not_verified()
+    {
+        config(['user-authentication.verification.require_email_verification' => true]);
+
+        $faker = Factory::create();
+        $response = $this->postJson('/api/register', [
+            'email' => $faker->unique()->safeEmail,
+            'first_name' => $faker->firstName,
+            'last_name' => $faker->lastName,
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Email verification required. Please verify your email first.',
+            ]);
+    }
+
+    public function test_register_with_email_verification_enabled_and_verified()
+    {
+        config(['user-authentication.verification.require_email_verification' => true]);
+
+        $faker = Factory::create();
+        $email = $faker->unique()->safeEmail;
+        $verificationCode = random_int(100000, 999999);
+
+        VerificationCode::create([
+            'contact' => $email,
+            'code' => Hash::make($verificationCode),
+            'purpose' => 'registration_email',
+            'expires_at' => now()->addMinutes(5),
+            'verified_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/register', [
+            'email' => $email,
+            'first_name' => $faker->firstName,
+            'last_name' => $faker->lastName,
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'user',
+                    'token',
+                ],
+                'message',
+            ]);
+
+        $this->assertDatabaseHas('users', ['email' => $email]);
+    }
+
+    public function test_register_with_phone_verification_enabled_but_not_verified()
+    {
+        config(['user-authentication.verification.require_phone_verification' => true]);
+
+        $faker = Factory::create();
+        $phone = '+1234567890';
+
+        $response = $this->postJson('/api/register', [
+            'email' => $faker->unique()->safeEmail,
+            'phone' => $phone,
+            'first_name' => $faker->firstName,
+            'last_name' => $faker->lastName,
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Phone verification required. Please verify your phone first.',
+            ]);
+    }
+
+    public function test_register_with_phone_verification_enabled_and_verified()
+    {
+        config(['user-authentication.verification.require_phone_verification' => true]);
+
+        $faker = Factory::create();
+        $phone = '+1234567890';
+        $verificationCode = random_int(100000, 999999);
+
+        VerificationCode::create([
+            'contact' => $phone,
+            'code' => Hash::make($verificationCode),
+            'purpose' => 'registration_phone',
+            'expires_at' => now()->addMinutes(5),
+            'verified_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/register', [
+            'email' => $faker->unique()->safeEmail,
+            'phone' => $phone,
+            'first_name' => $faker->firstName,
+            'last_name' => $faker->lastName,
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'user',
+                    'token',
+                ],
+                'message',
+            ]);
+
+        $this->assertDatabaseHas('users', ['phone' => $phone]);
     }
 
     /**

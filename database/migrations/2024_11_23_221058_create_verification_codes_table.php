@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('code');
             $table->string('purpose');
             $table->timestamp('expires_at');
+            $table->timestamp('verified_at')->nullable();
             $table->timestamps();
         });
     }

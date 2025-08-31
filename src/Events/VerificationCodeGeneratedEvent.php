@@ -6,7 +6,7 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class PasswordResetCodeGeneratedEvent
+class VerificationCodeGeneratedEvent
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -14,7 +14,9 @@ class PasswordResetCodeGeneratedEvent
      * Create a new event instance.
      */
     public function __construct(
-        public string $email,
-        public string $code
+        public string $contact,
+        public string $code,
+        public string $purpose,
+        public string $type = 'email' // 'email' or 'phone'
     ) {}
 }
