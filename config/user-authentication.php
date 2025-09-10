@@ -21,5 +21,13 @@ return [
         'code_expiry_minutes' => 5,            // How long codes are valid
         'rate_limit_attempts' => 3,             // Number of attempts before rate limiting
         'rate_limit_minutes' => 5,              // Rate limit window in minutes
+        'provider' => 'default',                // Verification provider: 'default', 'smartpings'
+        'self_managed' => true,                 // Set to false to let the provider handle the entire flow
+    ],
+
+    // SmartPings configuration
+    'smartpings' => [
+        'client_id' => env('SMARTPINGS_CLIENT_ID'),
+        'secret_id' => env('SMARTPINGS_SECRET_ID'),
     ],
 ];

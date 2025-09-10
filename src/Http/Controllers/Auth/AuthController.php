@@ -19,6 +19,7 @@ use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Models\OauthAccount;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
+use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
@@ -78,31 +79,17 @@ class AuthController extends Controller
             }
 
             // Check if verification codes have been verified when required
+            $smartPingsService = app(SmartPingsVerificationService::class);
+
             if ($requireEmailVerification) {
-                $verifiedCode = VerificationCode::where('contact', $request->email)
-                    ->where('purpose', 'registration_email')
-                    ->where('verified_at', '!=', null)
-                    ->where('expires_at', '>', now())
-                    ->first();
-
-                if (! $verifiedCode) {
-                    $response = $this->failure('Email verification required. Please verify your email first.', 422);
-
-                    return $this->runAfterHooks($request, $response, HookAction::REGISTER);
+                if ($response = $this->checkVerificationStatus($request, $smartPingsService, $request->email, 'email', HookAction::REGISTER)) {
+                    return $response;
                 }
             }
 
             if ($requirePhoneVerification && $request->has('phone')) {
-                $verifiedCode = VerificationCode::where('contact', $request->phone)
-                    ->where('purpose', 'registration_phone')
-                    ->where('verified_at', '!=', null)
-                    ->where('expires_at', '>', now())
-                    ->first();
-
-                if (! $verifiedCode) {
-                    $response = $this->failure('Phone verification required. Please verify your phone first.', 422);
-
-                    return $this->runAfterHooks($request, $response, HookAction::REGISTER);
+                if ($response = $this->checkVerificationStatus($request, $smartPingsService, $request->phone, 'phone', HookAction::REGISTER)) {
+                    return $response;
                 }
             }
 
@@ -377,22 +364,36 @@ class AuthController extends Controller
             }
         }
 
-        // Generate verification code
-        $codeLength = config('user-authentication.verification.code_length', 6);
-        $verificationCode = str_pad(random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
-        $expiryMinutes = config('user-authentication.verification.code_expiry_minutes');
-        $expiresAt = now()->addMinutes($expiryMinutes);
+        // Check if SmartPings is enabled and not self-managed
+        $smartPingsService = app(SmartPingsVerificationService::class);
 
-        // Store the verification code
-        VerificationCode::updateOrCreate(
-            ['contact' => $contact, 'purpose' => "{$purpose}_{$type}"],
-            ['code' => Hash::make($verificationCode), 'expires_at' => $expiresAt]
-        );
+        if ($smartPingsService->isEnabled()) {
+            // Use SmartPings for verification
+            $result = $smartPingsService->sendVerification($contact, $type);
 
-        // Dispatch event for sending the code
-        VerificationCodeGeneratedEvent::dispatch($contact, $verificationCode, "{$purpose}_{$type}", $type);
+            if ($result['success']) {
+                $response = $this->success([], $result['message']);
+            } else {
+                $response = $this->failure($result['message'], 500);
+            }
+        } else {
+            // Use default verification system
+            $codeLength = config('user-authentication.verification.code_length', 6);
+            $verificationCode = str_pad(random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
+            $expiryMinutes = config('user-authentication.verification.code_expiry_minutes');
+            $expiresAt = now()->addMinutes($expiryMinutes);
 
-        $response = $this->success([], "Verification code sent to your {$type}.");
+            // Store the verification code
+            VerificationCode::updateOrCreate(
+                ['contact' => $contact, 'purpose' => "{$purpose}_{$type}"],
+                ['code' => Hash::make($verificationCode), 'expires_at' => $expiresAt]
+            );
+
+            // Dispatch event for sending the code
+            VerificationCodeGeneratedEvent::dispatch($contact, $verificationCode, "{$purpose}_{$type}", $type);
+
+            $response = $this->success([], "Verification code sent to your {$type}.");
+        }
 
         return $this->runAfterHooks($request, $response, HookAction::SEND_VERIFICATION_CODE);
     }
@@ -440,23 +441,71 @@ class AuthController extends Controller
         $type = $request->type;
         $purpose = $request->purpose ?? 'registration';
 
-        $codeEntry = VerificationCode::where('contact', $contact)
-            ->where('purpose', "{$purpose}_{$type}")
-            ->first();
+        // Check if SmartPings is enabled and not self-managed
+        $smartPingsService = app(SmartPingsVerificationService::class);
 
-        if (! $codeEntry) {
-            return $this->failure('Invalid or expired code.', 400);
+        if ($smartPingsService->isEnabled()) {
+            // Use SmartPings for verification
+            $verified = $smartPingsService->verify($contact, $code, $type);
+
+            if ($verified) {
+                $response = $this->success([], 'Code verified successfully.');
+            } else {
+                $response = $this->failure('Invalid or expired code.', 400);
+            }
+        } else {
+            // Use default verification system
+            $codeEntry = VerificationCode::where('contact', $contact)
+                ->where('purpose', "{$purpose}_{$type}")
+                ->first();
+
+            if (! $codeEntry) {
+                return $this->failure('Invalid or expired code.', 400);
+            }
+
+            if (! Hash::check($code, $codeEntry->code) || $codeEntry->isExpired()) {
+                return $this->failure('Invalid or expired code.', 400);
+            }
+
+            // Mark the code as verified
+            $codeEntry->update(['verified_at' => now()]);
+
+            $response = $this->success([], 'Code verified successfully.');
         }
-
-        if (! Hash::check($code, $codeEntry->code) || $codeEntry->isExpired()) {
-            return $this->failure('Invalid or expired code.', 400);
-        }
-
-        // Mark the code as verified
-        $codeEntry->update(['verified_at' => now()]);
-
-        $response = $this->success([], 'Code verified successfully.');
 
         return $this->runAfterHooks($request, $response, HookAction::VERIFY_CODE);
+    }
+
+    private function checkVerificationStatus(
+        Request $request,
+        SmartPingsVerificationService $smartPingsService,
+        string $contact,
+        string $type,
+        HookAction $hookAction
+    ): ?JsonResponse {
+        $purpose = 'registration_'.$type;
+        $errorMessage = ucfirst($type).' verification required. Please verify your '.$type.' first.';
+
+        if ($smartPingsService->isEnabled()) {
+            if (! $smartPingsService->isVerified($contact, $type)) {
+                $response = $this->failure($errorMessage, 422);
+
+                return $this->runAfterHooks($request, $response, $hookAction);
+            }
+        } else {
+            $verifiedCode = VerificationCode::where('contact', $contact)
+                ->where('purpose', $purpose)
+                ->where('verified_at', '!=', null)
+                ->where('expires_at', '>', now())
+                ->first();
+
+            if (! $verifiedCode) {
+                $response = $this->failure($errorMessage, 422);
+
+                return $this->runAfterHooks($request, $response, $hookAction);
+            }
+        }
+
+        return null;
     }
 }
