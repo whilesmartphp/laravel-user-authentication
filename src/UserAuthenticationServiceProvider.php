@@ -27,6 +27,10 @@ class UserAuthenticationServiceProvider extends ServiceProvider
                 return new $formatter;
             }
         );
+
+        $this->app->singleton(
+            \Whilesmart\UserAuthentication\Services\SmartPingsVerificationService::class
+        );
     }
 
     /**

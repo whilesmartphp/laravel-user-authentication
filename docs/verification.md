@@ -1,15 +1,53 @@
 # Email/Phone Verification
 
-This package provides configurable email and phone verification before user registration. The verification system uses Laravel events, allowing you to integrate with any email/SMS provider.
+This package provides configurable email and phone verification before user registration. You can choose between:
 
-## Configuration
+1. **Managed Verification** - Using SmartPings to handle the entire verification flow
+2. **Self-Managed Verification** - Using Laravel events to integrate with any provider
 
-Enable verification in your `config/user-authentication.php`:
+## Configuration Options
+
+### Option 1: SmartPings Managed Verification
+
+For hassle-free verification where SmartPings handles sending and validation:
 
 ```php
+// config/user-authentication.php
 'verification' => [
     'require_email_verification' => true,   // Require email verification before registration
     'require_phone_verification' => false,  // Require phone verification before registration
+    'provider' => 'smartpings',            // Use SmartPings provider
+    'self_managed' => false,               // Let SmartPings handle everything
+    'code_expiry_minutes' => 5,            // Code expiry time in minutes (default: 5)
+    'rate_limit_attempts' => 3,             // Rate limit attempts (default: 3)
+    'rate_limit_minutes' => 5,              // Rate limit window in minutes (default: 5)
+],
+
+// SmartPings credentials
+'smartpings' => [
+    'client_id' => env('SMARTPINGS_CLIENT_ID'),
+    'secret_id' => env('SMARTPINGS_SECRET_ID'),
+],
+```
+
+Set your credentials in `.env`:
+
+```bash
+SMARTPINGS_CLIENT_ID=your-client-id
+SMARTPINGS_SECRET_ID=your-secret-id
+```
+
+### Option 2: Self-Managed Verification
+
+For custom integration with your preferred email/SMS providers:
+
+```php
+// config/user-authentication.php
+'verification' => [
+    'require_email_verification' => true,   // Require email verification before registration
+    'require_phone_verification' => false,  // Require phone verification before registration
+    'provider' => 'default',               // Use default (self-managed) provider
+    'self_managed' => true,                // Handle sending yourself via events
     'code_length' => 6,                     // Length of verification codes (default: 6)
     'code_expiry_minutes' => 5,             // Code expiry time in minutes (default: 5)
     'rate_limit_attempts' => 3,             // Rate limit attempts (default: 3)
@@ -24,9 +62,36 @@ When verification is enabled, these endpoints become available:
 * **POST /api/send-verification-code:** Send verification code to email or phone
 * **POST /api/verify-code:** Verify a submitted code
 
-## Event-Driven Integration
+## SmartPings Managed Verification
 
-The package dispatches `VerificationCodeGeneratedEvent` when codes are generated. You must create event listeners to actually send the codes via your preferred providers.
+When using SmartPings managed verification, you get a complete hands-off verification solution:
+
+### What SmartPings Handles
+
+- **Code Generation & Delivery**: Verification codes are generated and sent directly by SmartPings
+- **No Database Storage**: Codes aren't stored in your database - SmartPings manages everything
+- **No Email/SMS Setup**: No need to configure email providers or SMS gateways
+- **Security & Rate Limiting**: Built-in protection against abuse and spam attempts
+- **Multi-Channel Support**: Handles both email and SMS verification seamlessly
+- **International Support**: Proper handling of phone numbers (use `00` country code prefix)
+
+### Benefits
+
+- **Zero Configuration**: Just add your SmartPings credentials
+- **No Infrastructure**: No need to manage email servers or SMS providers  
+- **Built-in Security**: Enterprise-grade security and rate limiting
+- **Reliability**: High deliverability rates and redundant infrastructure
+- **Compliance**: Handles anti-spam and telecommunications regulations
+
+### API Flow
+
+1. **Send Verification**: Your app calls `POST /api/send-verification-code` → SmartPings sends the code
+2. **Verify Code**: User submits code via `POST /api/verify-code` → Validated with SmartPings
+3. **Registration**: Your app checks verification status before allowing registration
+
+## Event-Driven Integration (Self-Managed)
+
+When using self-managed verification, the package dispatches `VerificationCodeGeneratedEvent` when codes are generated. You must create event listeners to actually send the codes via your preferred providers.
 
 ### Setting Up Email Verification with Laravel Mail
 

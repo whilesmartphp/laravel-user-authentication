@@ -10,6 +10,7 @@ use Whilesmart\UserAuthentication\Events\PasswordResetCompleteEvent;
 use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
+use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
 
 use function Orchestra\Testbench\workbench_path;
 
@@ -301,7 +302,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
     {
         Event::fake();
 
-        $phone = '+1234567890';
+        $phone = '001234567890';
 
         $response = $this->postJson('/api/send-verification-code', [
             'contact' => $phone,
@@ -550,7 +551,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
         config(['user-authentication.verification.require_phone_verification' => true]);
 
         $faker = Factory::create();
-        $phone = '+1234567890';
+        $phone = '001234567890';
 
         $response = $this->postJson('/api/register', [
             'email' => $faker->unique()->safeEmail,
@@ -572,7 +573,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
         config(['user-authentication.verification.require_phone_verification' => true]);
 
         $faker = Factory::create();
-        $phone = '+1234567890';
+        $phone = '001234567890';
         $verificationCode = random_int(100000, 999999);
 
         VerificationCode::create([
@@ -602,6 +603,161 @@ class TestCase extends \Orchestra\Testbench\TestCase
             ]);
 
         $this->assertDatabaseHas('users', ['phone' => $phone]);
+    }
+
+    public function test_smartpings_service_is_disabled_when_not_configured()
+    {
+        config([
+            'user-authentication.verification.provider' => 'default',
+            'user-authentication.verification.self_managed' => true,
+        ]);
+
+        $service = new SmartPingsVerificationService;
+        $this->assertFalse($service->isEnabled());
+    }
+
+    public function test_smartpings_send_verification_returns_error_when_disabled()
+    {
+        config([
+            'user-authentication.verification.provider' => 'default',
+            'user-authentication.verification.self_managed' => true,
+        ]);
+
+        $service = new SmartPingsVerificationService;
+        $result = $service->sendVerification('test@example.com', 'email');
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('SmartPings verification is not enabled', $result['message']);
+    }
+
+    public function test_send_verification_code_with_smartpings_enabled()
+    {
+        config([
+            'user-authentication.verification.provider' => 'smartpings',
+            'user-authentication.verification.self_managed' => false,
+            'user-authentication.smartpings.client_id' => 'test-client-id',
+            'user-authentication.smartpings.secret_id' => 'test-secret-id',
+        ]);
+
+        $mockService = $this->createMock(SmartPingsVerificationService::class);
+        $mockService->method('isEnabled')->willReturn(true);
+        $mockService->method('sendVerification')->willReturn([
+            'success' => true,
+            'message' => 'Email verification sent successfully',
+        ]);
+        $this->app->bind(SmartPingsVerificationService::class, function () use ($mockService) {
+            return $mockService;
+        });
+
+        $response = $this->postJson('/api/send-verification-code', [
+            'contact' => 'test@example.com',
+            'type' => 'email',
+            'purpose' => 'registration',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['message' => 'Email verification sent successfully']);
+    }
+
+    public function test_verify_code_with_smartpings_enabled()
+    {
+        config([
+            'user-authentication.verification.provider' => 'smartpings',
+            'user-authentication.verification.self_managed' => false,
+            'user-authentication.smartpings.client_id' => 'test-client-id',
+            'user-authentication.smartpings.secret_id' => 'test-secret-id',
+        ]);
+
+        $mockService = $this->createMock(SmartPingsVerificationService::class);
+        $mockService->method('isEnabled')->willReturn(true);
+        $mockService->method('verify')->willReturn(true);
+        $this->app->bind(SmartPingsVerificationService::class, function () use ($mockService) {
+            return $mockService;
+        });
+
+        $response = $this->postJson('/api/verify-code', [
+            'contact' => 'test@example.com',
+            'code' => '123456',
+            'type' => 'email',
+            'purpose' => 'registration',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['message' => 'Code verified successfully.']);
+    }
+
+    public function test_register_with_smartpings_email_verification_enabled_and_verified()
+    {
+        config([
+            'user-authentication.verification.require_email_verification' => true,
+            'user-authentication.verification.provider' => 'smartpings',
+            'user-authentication.verification.self_managed' => false,
+            'user-authentication.smartpings.client_id' => 'test-client-id',
+            'user-authentication.smartpings.secret_id' => 'test-secret-id',
+        ]);
+
+        $mockService = $this->createMock(SmartPingsVerificationService::class);
+        $mockService->method('isEnabled')->willReturn(true);
+        $mockService->method('isVerified')->willReturn(true);
+        $this->app->bind(SmartPingsVerificationService::class, function () use ($mockService) {
+            return $mockService;
+        });
+
+        $faker = Factory::create();
+        $email = $faker->unique()->safeEmail;
+
+        $response = $this->postJson('/api/register', [
+            'email' => $email,
+            'first_name' => $faker->firstName,
+            'last_name' => $faker->lastName,
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'user',
+                    'token',
+                ],
+                'message',
+            ]);
+
+        $this->assertDatabaseHas('users', ['email' => $email]);
+    }
+
+    public function test_register_with_smartpings_email_verification_enabled_but_not_verified()
+    {
+        config([
+            'user-authentication.verification.require_email_verification' => true,
+            'user-authentication.verification.provider' => 'smartpings',
+            'user-authentication.verification.self_managed' => false,
+            'user-authentication.smartpings.client_id' => 'test-client-id',
+            'user-authentication.smartpings.secret_id' => 'test-secret-id',
+        ]);
+
+        $mockService = $this->createMock(SmartPingsVerificationService::class);
+        $mockService->method('isEnabled')->willReturn(true);
+        $mockService->method('isVerified')->willReturn(false);
+        $this->app->bind(SmartPingsVerificationService::class, function () use ($mockService) {
+            return $mockService;
+        });
+
+        $faker = Factory::create();
+        $email = $faker->unique()->safeEmail;
+
+        $response = $this->postJson('/api/register', [
+            'email' => $email,
+            'first_name' => $faker->firstName,
+            'last_name' => $faker->lastName,
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Email verification required. Please verify your email first.',
+            ]);
     }
 
     /**
