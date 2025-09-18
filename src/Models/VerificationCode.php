@@ -17,4 +17,22 @@ class VerificationCode extends Model
     {
         return now()->greaterThan($this->expires_at);
     }
+
+    /**
+     * Clean up expired verification codes.
+     */
+    public static function cleanupExpired(): int
+    {
+        return static::where('expires_at', '<', now())->delete();
+    }
+
+    /**
+     * Clean up old verified codes (older than 1 hour).
+     */
+    public static function cleanupOldVerified(): int
+    {
+        return static::where('verified_at', '!=', null)
+            ->where('verified_at', '<', now()->subHour())
+            ->delete();
+    }
 }

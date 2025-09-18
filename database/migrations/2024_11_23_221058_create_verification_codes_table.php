@@ -19,6 +19,10 @@ return new class extends Migration
             $table->timestamp('expires_at');
             $table->timestamp('verified_at')->nullable();
             $table->timestamps();
+
+            // Add indices for faster lookups
+            $table->index(['contact', 'purpose', 'verified_at']);
+            $table->index('expires_at');
         });
     }
 

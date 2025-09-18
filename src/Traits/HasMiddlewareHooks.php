@@ -45,7 +45,7 @@ trait HasMiddlewareHooks
                 if ($hook instanceof MiddlewareHookInterface) {
                     $actionValue = $action instanceof HookAction ? $action->value : $action;
                     $result = $hook->after($request, $response, $actionValue);
-                    if ($result instanceof Response) {
+                    if ($result instanceof JsonResponse) {
                         $response = $result;
                     }
                 }

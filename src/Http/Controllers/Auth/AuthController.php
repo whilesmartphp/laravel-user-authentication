@@ -321,19 +321,7 @@ class AuthController extends Controller
     {
         $request = $this->runBeforeHooks($request, HookAction::SEND_VERIFICATION_CODE);
 
-        // Rate limiting
-        $rateLimitKey = 'verification-code:'.$request->ip();
-        $attempts = config('user-authentication.verification.rate_limit_attempts');
-        $minutes = config('user-authentication.verification.rate_limit_minutes', 5);
-
-        if (RateLimiter::tooManyAttempts($rateLimitKey, $attempts)) {
-            $response = $this->failure('Too many attempts, please try again later.', 429);
-
-            return $this->runAfterHooks($request, $response, HookAction::SEND_VERIFICATION_CODE);
-        }
-
-        RateLimiter::hit($rateLimitKey, $minutes * 60);
-
+        // Validate request first to get contact for rate limiting
         $validator = Validator::make($request->all(), [
             'contact' => 'required|string',
             'type' => 'required|string|in:email,phone',
@@ -344,7 +332,22 @@ class AuthController extends Controller
             return $this->failure('Validation failed.', 422, [$validator->errors()]);
         }
 
+        // Enhanced rate limiting with IP + contact
         $contact = $request->contact;
+        $rateLimitKeyIp = 'verification-code:ip:'.$request->ip();
+        $rateLimitKeyContact = 'verification-code:contact:'.hash('sha256', $contact);
+        $attempts = config('user-authentication.verification.rate_limit_attempts');
+        $minutes = config('user-authentication.verification.rate_limit_minutes', 5);
+
+        if (RateLimiter::tooManyAttempts($rateLimitKeyIp, $attempts) ||
+            RateLimiter::tooManyAttempts($rateLimitKeyContact, $attempts)) {
+            $response = $this->failure('Too many attempts, please try again later.', 429);
+
+            return $this->runAfterHooks($request, $response, HookAction::SEND_VERIFICATION_CODE);
+        }
+
+        RateLimiter::hit($rateLimitKeyIp, $minutes * 60);
+        RateLimiter::hit($rateLimitKeyContact, $minutes * 60);
         $type = $request->type;
         $purpose = $request->purpose ?? 'registration';
 
@@ -382,6 +385,9 @@ class AuthController extends Controller
             $verificationCode = str_pad(random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
             $expiryMinutes = config('user-authentication.verification.code_expiry_minutes');
             $expiresAt = now()->addMinutes($expiryMinutes);
+
+            // Clean up expired codes before storing new one
+            VerificationCode::cleanupExpired();
 
             // Store the verification code
             VerificationCode::updateOrCreate(
