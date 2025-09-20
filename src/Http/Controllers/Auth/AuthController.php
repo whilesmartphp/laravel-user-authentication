@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
-use OpenApi\Attributes as OA;
 use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Events\UserLoggedOutEvent;
@@ -24,35 +23,10 @@ use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
 
-#[OA\Tag(name: 'Authentication', description: 'Endpoints for user authentication')]
 class AuthController extends Controller
 {
     use ApiResponse, HasMiddlewareHooks, Loggable;
 
-    #[OA\Post(
-        path: '/register',
-        summary: 'Register a new user',
-        security: [],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ['email', 'first_name', 'password'],
-                properties: [
-                    new OA\Property(property: 'email', type: 'string', format: 'email'),
-                    new OA\Property(property: 'first_name', type: 'string'),
-                    new OA\Property(property: 'last_name', type: 'string'),
-                    new OA\Property(property: 'username', type: 'string'),
-                    new OA\Property(property: 'phone', type: 'string'),
-                    new OA\Property(property: 'password', type: 'string', format: 'password'),
-                ]
-            )
-        ),
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 201, description: 'User registered successfully'),
-            new OA\Response(response: 422, description: 'Validation error'),
-        ]
-    )]
     public function register(Request $request): JsonResponse
     {
         $request = $this->runBeforeHooks($request, HookAction::REGISTER);
@@ -118,29 +92,6 @@ class AuthController extends Controller
         }
     }
 
-    #[OA\Post(
-        path: '/login',
-        summary: 'User login',
-        security: [],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ['password'],
-                properties: [
-                    new OA\Property(property: 'email', type: 'string', format: 'email'),
-                    new OA\Property(property: 'phone', type: 'string'),
-                    new OA\Property(property: 'username', type: 'string'),
-                    new OA\Property(property: 'password', type: 'string', format: 'password'),
-                ]
-            )
-        ),
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 200, description: 'User successfully logged in'),
-            new OA\Response(response: 401, description: 'Invalid credentials'),
-            new OA\Response(response: 500, description: 'Server error'),
-        ]
-    )]
     public function login(Request $request): JsonResponse
     {
         $request = $this->runBeforeHooks($request, HookAction::LOGIN);
@@ -195,19 +146,6 @@ class AuthController extends Controller
         }
     }
 
-    #[OA\Post(
-        path: '/logout',
-        summary: 'User logout',
-        security: [
-            ['sanctum' => []],
-        ],
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 200, description: 'User successfully logged out'),
-            new OA\Response(response: 401, description: 'Invalid credentials'),
-            new OA\Response(response: 500, description: 'Server error'),
-        ]
-    )]
     public function logout(Request $request): JsonResponse
     {
         $request = $this->runBeforeHooks($request, HookAction::LOGOUT);
@@ -221,15 +159,6 @@ class AuthController extends Controller
         return $this->runAfterHooks($request, $response, HookAction::LOGOUT);
     }
 
-    #[OA\Get(
-        path: '/oauth/{driver}/login',
-        summary: 'Get Oauth redirect URI',
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 200, description: 'URL generated'),
-            new OA\Response(response: 500, description: 'Server error'),
-        ]
-    )]
     public function oauthLogin(Request $request, $driver): JsonResponse
     {
         $request = $this->runBeforeHooks($request, HookAction::OAUTH_LOGIN);
@@ -244,15 +173,6 @@ class AuthController extends Controller
         return $this->runAfterHooks($request, $response, HookAction::OAUTH_LOGIN);
     }
 
-    #[OA\Get(
-        path: '/oauth/{driver}/callback',
-        summary: 'Handles Oauth login callback',
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 200, description: ' '),
-            new OA\Response(response: 500, description: 'Server error'),
-        ]
-    )]
     public function oauthCallback(Request $request, $driver): JsonResponse
     {
         $request = $this->runBeforeHooks($request, HookAction::OAUTH_CALLBACK);
@@ -295,28 +215,6 @@ class AuthController extends Controller
 
     }
 
-    #[OA\Post(
-        path: '/send-verification-code',
-        summary: 'Send verification code to email or phone',
-        security: [],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ['contact', 'type'],
-                properties: [
-                    new OA\Property(property: 'contact', type: 'string', description: 'Email address or phone number'),
-                    new OA\Property(property: 'type', type: 'string', enum: ['email', 'phone'], description: 'Type of contact'),
-                    new OA\Property(property: 'purpose', type: 'string', enum: ['registration', 'login'], description: 'Purpose of verification (optional, defaults to "registration")', example: 'registration'),
-                ]
-            )
-        ),
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 200, description: 'Verification code sent successfully'),
-            new OA\Response(response: 422, description: 'Validation error'),
-            new OA\Response(response: 429, description: 'Too many requests'),
-        ]
-    )]
     public function sendVerificationCode(Request $request): JsonResponse
     {
         $request = $this->runBeforeHooks($request, HookAction::SEND_VERIFICATION_CODE);
@@ -404,29 +302,6 @@ class AuthController extends Controller
         return $this->runAfterHooks($request, $response, HookAction::SEND_VERIFICATION_CODE);
     }
 
-    #[OA\Post(
-        path: '/verify-code',
-        summary: 'Verify a code for email or phone',
-        security: [],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ['contact', 'code', 'type'],
-                properties: [
-                    new OA\Property(property: 'contact', type: 'string', description: 'Email address or phone number'),
-                    new OA\Property(property: 'code', type: 'string', description: 'Verification code'),
-                    new OA\Property(property: 'type', type: 'string', enum: ['email', 'phone'], description: 'Type of contact'),
-                    new OA\Property(property: 'purpose', type: 'string', enum: ['registration', 'login'], description: 'Purpose of verification (optional, defaults to "registration")', example: 'registration'),
-                ]
-            )
-        ),
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 200, description: 'Code verified successfully'),
-            new OA\Response(response: 400, description: 'Invalid or expired code'),
-            new OA\Response(response: 422, description: 'Validation error'),
-        ]
-    )]
     public function verifyCode(Request $request): JsonResponse
     {
         $request = $this->runBeforeHooks($request, HookAction::VERIFY_CODE);

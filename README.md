@@ -158,6 +158,29 @@ The package dispatches events for extensibility:
 * `PasswordResetCodeGeneratedEvent` - When password reset codes are generated
 * `PasswordResetCompleteEvent` - After password reset
 
+## OpenAPI Documentation
+
+To include the authentication endpoints in your OpenAPI specification, publish the documentation class:
+
+```bash
+php artisan vendor:publish --provider="Whilesmart\UserAuthentication\UserAuthenticationServiceProvider" --tag="laravel-user-authentication-docs"
+```
+
+This will create `app/Http/Documentation/UserAuthOpenApiDocs.php` containing all OpenAPI attributes for the authentication endpoints. Your OpenAPI generator will automatically discover and include these endpoints.
+
+### Alternative: Publish specific tags
+
+```bash
+# Publish only documentation
+php artisan vendor:publish --tag="laravel-user-authentication-docs"
+
+# Publish only configuration  
+php artisan vendor:publish --tag="laravel-user-authentication-config"
+
+# Publish everything
+php artisan vendor:publish --provider="Whilesmart\UserAuthentication\UserAuthenticationServiceProvider"
+```
+
 ## Documentation
 
 * **📖 [Installation Guide](docs/installation.md)** - Complete installation instructions

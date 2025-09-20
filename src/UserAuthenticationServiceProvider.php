@@ -80,5 +80,10 @@ class UserAuthenticationServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/user-authentication.php' => config_path('user-authentication.php'),
         ], ['laravel-user-authentication', 'laravel-user-authentication-config']);
+
+        // Publish OpenAPI documentation
+        $this->publishes([
+            __DIR__.'/Documentation/UserAuthOpenApiDocs.php' => app_path('Http/Documentation/UserAuthOpenApiDocs.php'),
+        ], ['laravel-user-authentication', 'laravel-user-authentication-docs', 'laravel-user-authentication-openapi']);
     }
 }
