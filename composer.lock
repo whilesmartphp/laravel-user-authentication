@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4a4e3a097ce82938a2c28a5cb17f2ba2",
+    "content-hash": "345c54f3a1e09288b8ce6463152d25dc",
     "packages": [
         {
             "name": "brick/math",
@@ -3570,6 +3570,61 @@
                 "source": "https://github.com/ramsey/uuid/tree/4.8.1"
             },
             "time": "2025-06-01T06:28:46+00:00"
+        },
+        {
+            "name": "smartpings/php-sdk",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/smartpingshq/php-sdk.git",
+                "reference": "fa0e563c369fae77b8c9629ac44b111dae466edb"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/smartpingshq/php-sdk/zipball/fa0e563c369fae77b8c9629ac44b111dae466edb",
+                "reference": "fa0e563c369fae77b8c9629ac44b111dae466edb",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.0",
+                "php": "^8.1",
+                "psr/http-client": "^1.0",
+                "psr/log": "^1.0 || ^2.0 || ^3.0"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.17",
+                "phpunit/phpunit": "^9.5"
+            },
+            "default-branch": true,
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Smartpings\\Messaging\\SmartpingsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Smartpings\\Messaging\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "SmartPings",
+                    "email": "engineering@smartpings.com"
+                }
+            ],
+            "description": "Smartpings Messaging Service",
+            "support": {
+                "issues": "https://github.com/smartpingshq/php-sdk/issues",
+                "source": "https://github.com/smartpingshq/php-sdk/tree/main"
+            },
+            "time": "2025-09-18T22:46:28+00:00"
         },
         {
             "name": "symfony/clock",
@@ -9004,7 +9059,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "smartpings/php-sdk": 20
+    },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {},

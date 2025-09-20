@@ -45,44 +45,40 @@ That's it! The package will auto-register routes and work out of the box.
 
 For hassle-free verification with SmartPings handling the entire flow:
 
-```php
-// config/user-authentication.php
-'verification' => [
-    'require_email_verification' => true,
-    'provider' => 'smartpings',        // Use SmartPings
-    'self_managed' => false,           // Let SmartPings handle everything
-],
-
-'smartpings' => [
-    'client_id' => env('SMARTPINGS_CLIENT_ID'),
-    'secret_id' => env('SMARTPINGS_SECRET_ID'),
-],
-```
-
 ```bash
 # .env
+USER_AUTH_REQUIRE_EMAIL_VERIFICATION=true
+USER_AUTH_REQUIRE_PHONE_VERIFICATION=false
+USER_AUTH_VERIFICATION_PROVIDER=smartpings
+USER_AUTH_SELF_MANAGED=false
+USER_AUTH_ROUTE_PREFIX=api
+
 SMARTPINGS_CLIENT_ID=your-client-id
 SMARTPINGS_SECRET_ID=your-secret-id
 ```
+
+All configuration is now environment-driven for better deployment flexibility.
 
 ### Option 2: Custom Provider (Self-Managed)
 
 Set up email or phone verification with event-driven integration:
 
-```php
-// config/user-authentication.php
-'verification' => [
-    'require_email_verification' => true,   // Require email verification before registration
-    'require_phone_verification' => false,  // Require phone verification before registration
-    'provider' => 'default',               // Use default (self-managed) provider
-    'self_managed' => true,                // Handle sending yourself via events
-    'code_length' => 6,                     // Length of verification codes (default: 6)
-    'code_expiry_minutes' => 5,             // Code expiry time in minutes (default: 5)
-    'rate_limit_attempts' => 3,             // Rate limit attempts (default: 3)
-    'rate_limit_minutes' => 5,              // Rate limit window in minutes (default: 5)
-],
+```bash
+# .env
+USER_AUTH_REQUIRE_EMAIL_VERIFICATION=true
+USER_AUTH_REQUIRE_PHONE_VERIFICATION=false
+USER_AUTH_VERIFICATION_PROVIDER=default
+USER_AUTH_SELF_MANAGED=true
+USER_AUTH_CODE_LENGTH=6
+USER_AUTH_CODE_EXPIRY_MINUTES=5
+USER_AUTH_RATE_LIMIT_ATTEMPTS=3
+USER_AUTH_RATE_LIMIT_MINUTES=5
+USER_AUTH_ROUTE_PREFIX=api
+```
 
-// Create event listeners to send codes via your preferred provider
+Create event listeners to send codes via your preferred provider:
+
+```php
 class SendVerificationCodeEmailListener {
     public function handle(VerificationCodeGeneratedEvent $event) {
         Mail::raw("Your code: {$event->code}", function($msg) use ($event) {
@@ -93,6 +89,51 @@ class SendVerificationCodeEmailListener {
 ```
 
 **📖 [Complete Verification Setup Guide](docs/verification.md)**
+
+## Environment Variables
+
+All package configuration is now environment-driven. Add these variables to your `.env` file:
+
+### Core Settings
+```bash
+# Route prefix for all authentication endpoints (default: api)
+USER_AUTH_ROUTE_PREFIX=api
+```
+
+### Verification Settings
+```bash
+# Email verification (default: false)
+USER_AUTH_REQUIRE_EMAIL_VERIFICATION=false
+
+# Phone verification (default: false)
+USER_AUTH_REQUIRE_PHONE_VERIFICATION=false
+
+# Verification provider: 'default' or 'smartpings' (default: default)
+USER_AUTH_VERIFICATION_PROVIDER=default
+
+# Self-managed verification (default: true)
+# Set to false when using SmartPings to let them handle the flow
+USER_AUTH_SELF_MANAGED=true
+
+# Verification code length (default: 6)
+USER_AUTH_CODE_LENGTH=6
+
+# Code expiry time in minutes (default: 5)
+USER_AUTH_CODE_EXPIRY_MINUTES=5
+
+# Rate limiting attempts before blocking (default: 3)
+USER_AUTH_RATE_LIMIT_ATTEMPTS=3
+
+# Rate limiting window in minutes (default: 5)
+USER_AUTH_RATE_LIMIT_MINUTES=5
+```
+
+### SmartPings Integration
+```bash
+# Required when USER_AUTH_VERIFICATION_PROVIDER=smartpings
+SMARTPINGS_CLIENT_ID=your-client-id
+SMARTPINGS_SECRET_ID=your-secret-id
+```
 
 ## Available Endpoints
 
@@ -116,6 +157,29 @@ The package dispatches events for extensibility:
 * `VerificationCodeGeneratedEvent` - When verification codes are generated
 * `PasswordResetCodeGeneratedEvent` - When password reset codes are generated
 * `PasswordResetCompleteEvent` - After password reset
+
+## OpenAPI Documentation
+
+To include the authentication endpoints in your OpenAPI specification, publish the documentation class:
+
+```bash
+php artisan vendor:publish --provider="Whilesmart\UserAuthentication\UserAuthenticationServiceProvider" --tag="laravel-user-authentication-docs"
+```
+
+This will create `app/Http/Documentation/UserAuthOpenApiDocs.php` containing all OpenAPI attributes for the authentication endpoints. Your OpenAPI generator will automatically discover and include these endpoints.
+
+### Alternative: Publish specific tags
+
+```bash
+# Publish only documentation
+php artisan vendor:publish --tag="laravel-user-authentication-docs"
+
+# Publish only configuration  
+php artisan vendor:publish --tag="laravel-user-authentication-config"
+
+# Publish everything
+php artisan vendor:publish --provider="Whilesmart\UserAuthentication\UserAuthenticationServiceProvider"
+```
 
 ## Documentation
 

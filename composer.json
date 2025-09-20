@@ -29,7 +29,8 @@
     },
     "require": {
         "laravel/sanctum": "^4.1",
-        "laravel/socialite": "^5.23"
+        "laravel/socialite": "^5.23",
+        "smartpings/php-sdk": "dev-main"
     },
     "autoload-dev": {
         "psr-4": {
