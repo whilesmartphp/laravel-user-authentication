@@ -1,0 +1,19 @@
+name: Pre-Release Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  pre-release-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pre release checks
+        uses: whilesmart/workflows/package/pre-release@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
