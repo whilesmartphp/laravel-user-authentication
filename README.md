@@ -146,6 +146,7 @@ SMARTPINGS_SECRET_ID=your-secret-id
 * `POST /api/password/reset` - Reset password
 * `GET /api/oauth/{provider}/login` - OAuth login
 * `GET /api/oauth/{provider}/callback` - OAuth callback
+* `POST /api/oauth/firebase/{provider}/callback` - Firebase OAuth callback. See the [Laravel Firebase Package](https://github.com/kreait/laravel-firebase) for Firebase configurations.
 
 ## Events
 

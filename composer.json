@@ -31,7 +31,8 @@
     "require": {
         "laravel/sanctum": "^4.1",
         "laravel/socialite": "^5.23",
-        "smartpings/php-sdk": "dev-main"
+        "smartpings/php-sdk": "dev-main",
+        "kreait/laravel-firebase": "^6.1"
     },
     "autoload-dev": {
         "psr-4": {

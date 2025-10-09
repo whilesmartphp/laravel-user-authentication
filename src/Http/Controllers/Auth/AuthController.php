@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Kreait\Firebase\Exception\Auth\FailedToVerifyToken;
+use Kreait\Firebase\Exception\AuthException;
+use Kreait\Firebase\Exception\FirebaseException;
+use Kreait\Laravel\Firebase\Facades\Firebase;
 use Laravel\Socialite\Facades\Socialite;
 use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
@@ -388,5 +392,71 @@ class AuthController extends Controller
         }
 
         return null;
+    }
+
+    public function firebaseAuthCallback(Request $request, string $driver)
+    {
+        $rules = ['token' => 'required|string'];
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            $response = $this->failure('Server failed to validate request.', 422, $errors->toArray());
+
+            return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+        }
+
+        $auth = Firebase::auth();
+        try {
+            $verifiedIdToken = $auth->verifyIdToken($request->token);
+            $uid = $verifiedIdToken->claims()->get('sub');
+            $user = $auth->getUser($uid);
+
+            $email = $user->email;
+            $name = $user->displayName;
+
+            if (empty($name) || empty($email)) {
+                $response = $this->failure('Your app must request the name and email of the user', 400);
+
+                return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+            }
+
+            $User = config('user-authentication.user_model', User::class);
+            $existing_user = $User::where('email', $email)->first();
+            if ($existing_user) {
+                UserLoggedInEvent::dispatch($existing_user);
+                $this->info("User with email $email just logged in via social auth ");
+            } else {
+                $user_data = ['first_name' => $name, 'email' => $email, 'password' => Hash::make(Str::random(10))];
+                $existing_user = $User::create($user_data);
+                UserRegisteredEvent::dispatch($existing_user);
+                $this->info("New user with email $email just registered via social auth ");
+            }
+
+            OauthAccount::firstOrCreate([
+                'user_id' => $existing_user->id,
+                'provider' => $driver,
+            ]);
+
+            $response = [
+                'user' => $existing_user,
+                'token' => $existing_user->createToken('auth-token')->plainTextToken,
+            ];
+
+            $response = $this->success($response, 'User authenticated successfully', 200);
+
+            return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+        } catch (FailedToVerifyToken $e) {
+            $this->error($e->getMessage());
+            $response = $this->failure('Invalid token', 400);
+
+            return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+        } catch (AuthException|FirebaseException $e) {
+            $this->error($e->getMessage());
+            $response = $this->failure('Invalid token', 400);
+
+            return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+        }
     }
 }
