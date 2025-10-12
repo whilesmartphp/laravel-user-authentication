@@ -396,6 +396,7 @@ class AuthController extends Controller
 
     public function firebaseAuthCallback(Request $request, string $driver)
     {
+        $driver = strtolower($driver);
         $rules = ['token' => 'required|string'];
 
         $validator = Validator::make($request->all(), $rules);
@@ -420,6 +421,13 @@ class AuthController extends Controller
                 $response = $this->failure('Your app must request the name and email of the user', 400);
 
                 return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+            }
+            if ($driver == 'apple' && ! config('user-authentication.allow_ios_private_emails', true)) {
+                if (str_contains($email, '@privaterelay.appleid.com')) {
+                    $response = $this->failure('Please enable Share My Email on your IOS device', 400);
+
+                    return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+                }
             }
 
             $User = config('user-authentication.user_model', User::class);
