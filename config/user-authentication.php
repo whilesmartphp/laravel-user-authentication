@@ -5,6 +5,7 @@ return [
     'register_routes' => true,
     'register_oauth_routes' => true,
     'route_prefix' => env('USER_AUTH_ROUTE_PREFIX', 'api'),
+    'allow_ios_private_emails' => env('USER_AUTH_ALLOW_IOS_PRIVATE_EMAILS', true),
 
     'response_formatter' => \Whilesmart\UserAuthentication\ResponseFormatters\DefaultResponseFormatter::class,
 
