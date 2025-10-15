@@ -2,7 +2,7 @@
     "name": "whilesmart/laravel-user-authentication",
     "description": "Package for managing user authentication across our projects",
     "license": "MIT",
-  "package-version": "1.0.3",
+  "package-version": "1.0.4",
   "authors": [
         {
             "name": "WhileSmart",

@@ -8,8 +8,10 @@
 - Added config file
 - Minor bug fixes
 
-
 ## [1.0.3] - 2025-10-01
 - Add response interception hooks
 - Implement pre-registration email and phone verification
 - Add response and middleware customization
+
+## [1.0.4] - 2025-10-15
+- Add support for firebase authentication
