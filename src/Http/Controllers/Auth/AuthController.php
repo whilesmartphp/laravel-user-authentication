@@ -191,22 +191,6 @@ class AuthController extends Controller
             return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
         }
 
-        // $User = config('user-authentication.user_model', User::class);
-        // $existing_user = $User::where('email', $email)->first();
-        // if ($existing_user) {
-        //     UserLoggedInEvent::dispatch($existing_user);
-        //     $this->info("User with email $email just logged in via social auth ");
-        // } else {
-        //     $user_data = ['first_name' => $name, 'email' => $email, 'password' => Hash::make(Str::random(10))];
-        //     $existing_user = $User::create($user_data);
-        //     UserRegisteredEvent::dispatch($existing_user);
-        //     $this->info("New user with email $email just registered via social auth ");
-        // }
-
-        // OauthAccount::firstOrCreate([
-        //     'user_id' => $existing_user->id,
-        //     'provider' => $driver,
-        // ]);
 
         $existing_user = $this->handleUserAuthentication($email, $name, $driver);
 
@@ -433,22 +417,6 @@ class AuthController extends Controller
                 }
             }
 
-            // $User = config('user-authentication.user_model', User::class);
-            // $existing_user = $User::where('email', $email)->first();
-            // if ($existing_user) {
-            //     UserLoggedInEvent::dispatch($existing_user);
-            //     $this->info("User with email $email just logged in via social auth ");
-            // } else {
-            //     $user_data = ['first_name' => $name, 'email' => $email, 'password' => Hash::make(Str::random(10))];
-            //     $existing_user = $User::create($user_data);
-            //     UserRegisteredEvent::dispatch($existing_user);
-            //     $this->info("New user with email $email just registered via social auth ");
-            // }
-
-            // OauthAccount::firstOrCreate([
-            //     'user_id' => $existing_user->id,
-            //     'provider' => $driver,
-            // ]);
             $existing_user = $this->handleUserAuthentication($email, $name, $driver);
 
             $response = [
@@ -481,7 +449,7 @@ class AuthController extends Controller
      * @return mixed The authenticated user instance.
      */
     private function handleUserAuthentication(string $email, string $name, string $driver){
-        $User = consig('user-authentication.user_model', User::class);
+        $User = config('user-authentication.user_model', User::class);
         $existing_user = $User::where('email', $email)->first();
         if ($existing_user){
             UserLoggedInEvent::dispatch($existing_user);
