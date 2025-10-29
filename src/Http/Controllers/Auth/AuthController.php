@@ -191,9 +191,7 @@ class AuthController extends Controller
             return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
         }
 
-
         $existing_user = $this->handleUserAuthentication($email, $name, $driver);
-
 
         $response = [
             'user' => $existing_user,
@@ -440,35 +438,33 @@ class AuthController extends Controller
         }
     }
 
-     /**
+    /**
      * Private helper method to handle user authentication (login/create) and OAuth account creation.
      *
-     * @param string $email
-     * @param string $name
-     * @param string $driver
      * @return mixed The authenticated user instance.
      */
-    private function handleUserAuthentication(string $email, string $name, string $driver){
+    private function handleUserAuthentication(string $email, string $name, string $driver)
+    {
         $User = config('user-authentication.user_model', User::class);
         $existing_user = $User::where('email', $email)->first();
-        if ($existing_user){
+        if ($existing_user) {
             UserLoggedInEvent::dispatch($existing_user);
             $this->info("User with email $email  just logged in via social auth ");
         } else {
             $user_data = [
                 'first_name' => $name,
                 'email' => $email,
-                'password' => Hash::make(Str::random(10))
+                'password' => Hash::make(Str::random(10)),
             ];
             $existing_user = $User::create($user_data);
             UserRegisteredEvent::dispatch($existing_user);
-            $this->info("New user with email $email just registered via social auth" );
+            $this->info("New user with email $email just registered via social auth");
         }
         OauthAccount::firstOrCreate([
             'user_id' => $existing_user->id,
-            'provider' => $driver
+            'provider' => $driver,
         ]);
+
         return $existing_user;
     }
-
 }
