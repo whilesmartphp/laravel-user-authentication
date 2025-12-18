@@ -17,6 +17,8 @@ class VerificationCodeGeneratedEvent
         public string $contact,
         public string $code,
         public string $purpose,
-        public string $type = 'email' // 'email' or 'phone'
+        public string $type = 'email', // 'email' or 'phone'
+        public ?string $magicLink = null
+
     ) {}
 }

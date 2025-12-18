@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Hash;
 use Orchestra\Testbench\Attributes\WithMigration;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
+use Whilesmart\UserAuthentication\Tests\TestCase;
+
 
 #[WithMigration]
 class VerificationSecurityTest extends TestCase

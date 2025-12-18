@@ -1,16 +1,20 @@
 <?php
 
+namespace Whilesmart\UserAuthentication\Tests;
+
 use Faker\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Orchestra\Testbench\Attributes\WithMigration;
+use PragmaRX\Google2FA\Google2FA;
 use Whilesmart\UserAuthentication\Events\PasswordResetCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Events\PasswordResetCompleteEvent;
 use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
 use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
+use PragmaRX\Google2FALaravel\ServiceProvider as Google2FAServiceProvider;
 
 use function Orchestra\Testbench\workbench_path;
 
@@ -26,6 +30,9 @@ class TestCase extends \Orchestra\Testbench\TestCase
             'password' => Hash::make('password123'),
             'first_name' => 'John',
             'last_name' => 'Doe',
+            'two_factor_enabled' => false,
+            'two_factor_secret' => null,
+            'two_factor_type' => 'totp',
         ], $attributes));
     }
 
@@ -782,6 +789,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
     {
         return [
             'Whilesmart\UserAuthentication\UserAuthenticationServiceProvider',
+            Google2FAServiceProvider::class,
         ];
     }
 }

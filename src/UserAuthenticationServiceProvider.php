@@ -85,5 +85,11 @@ class UserAuthenticationServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/Documentation/UserAuthOpenApiDocs.php' => app_path('Http/Documentation/UserAuthOpenApiDocs.php'),
         ], ['laravel-user-authentication', 'laravel-user-authentication-docs', 'laravel-user-authentication-openapi']);
+
+        // Register Middleware
+        $this->app['router']->aliasMiddleware(
+            'two-factor',
+            \Whilesmart\UserAuthentication\Http\Middleware\RedirectIfTwoFactorEnabled::class
+        );
     }
 }
