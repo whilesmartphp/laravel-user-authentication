@@ -22,7 +22,7 @@ return new class extends Migration
             }
             $table->text('two_factor_secret')->nullable();
             $table->boolean('two_factor_enabled')->default(false);
-            //2fa type options: totp, email, phone, smartpings
+            // 2fa type options: totp, email, phone, smartpings
             $table->string('two_factor_type')->default('totp');
             $table->timestamp('two_factor_confirmed_at')->nullable();
 

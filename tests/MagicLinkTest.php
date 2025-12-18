@@ -2,9 +2,9 @@
 
 namespace Whilesmart\UserAuthentication\Tests\Feature;
 
-use Whilesmart\UserAuthentication\Tests\TestCase;
-use Whilesmart\UserAuthentication\Models\User;
 use Illuminate\Support\Facades\URL;
+use Whilesmart\UserAuthentication\Models\User;
+use Whilesmart\UserAuthentication\Tests\TestCase;
 
 class MagicLinkTest extends TestCase
 {
@@ -15,8 +15,8 @@ class MagicLinkTest extends TestCase
 
         // Generate a valid signed URL
         $url = URL::temporarySignedRoute(
-            '2fa.verify.link', 
-            now()->addMinutes(15), 
+            '2fa.verify.link',
+            now()->addMinutes(15),
             ['user' => $user->id]
         );
 

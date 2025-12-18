@@ -2,9 +2,9 @@
 
 namespace Whilesmart\UserAuthentication\Tests\Feature;
 
-use Whilesmart\UserAuthentication\Tests\TestCase;
-use Whilesmart\UserAuthentication\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Whilesmart\UserAuthentication\Models\User;
+use Whilesmart\UserAuthentication\Tests\TestCase;
 
 class TwoFactorMiddlewareTest extends TestCase
 {
@@ -14,7 +14,7 @@ class TwoFactorMiddlewareTest extends TestCase
         // 1. Create a user with 2FA enabled
         $user = User::factory()->create([
             'two_factor_enabled' => true,
-            'two_factor_type' => 'totp'
+            'two_factor_type' => 'totp',
         ]);
 
         // 2. Act as the user (simulate password login success)
@@ -26,7 +26,7 @@ class TwoFactorMiddlewareTest extends TestCase
         // 4. Assert they get a 403 '2FA Required' response
         $response->assertStatus(403);
         $response->assertJsonStructure(['two_factor_required', 'method']);
-        
+
         // Assert the user was logged out of the full session
         $this->assertFalse(Auth::check());
     }

@@ -16,7 +16,7 @@ class TwoFactorAuthenticationTest extends TestCase
     {
         $user = $this->createUser([
             'two_factor_enabled' => true,
-            'two_factor_type' => 'totp'
+            'two_factor_type' => 'totp',
         ]);
 
         // Simulate a successful password login
@@ -29,7 +29,7 @@ class TwoFactorAuthenticationTest extends TestCase
         $response->assertStatus(403)
             ->assertJson([
                 'two_factor_required' => true,
-                'method' => 'totp'
+                'method' => 'totp',
             ]);
 
         // Assert: User is logged out and ID is in session
@@ -44,7 +44,7 @@ class TwoFactorAuthenticationTest extends TestCase
         $user = $this->createUser([
             'two_factor_enabled' => true,
             'two_factor_secret' => encrypt($secret),
-            'two_factor_type' => 'totp'
+            'two_factor_type' => 'totp',
         ]);
 
         // Mock the session state from middleware
@@ -54,7 +54,7 @@ class TwoFactorAuthenticationTest extends TestCase
         $validCode = Google2FA::getCurrentOtp($secret);
 
         $response = $this->postJson('/api/2fa/verify', [
-            'code' => $validCode
+            'code' => $validCode,
         ]);
 
         $response->assertStatus(200)
@@ -71,7 +71,7 @@ class TwoFactorAuthenticationTest extends TestCase
 
         $user = $this->createUser([
             'two_factor_enabled' => true,
-            'two_factor_type' => 'email'
+            'two_factor_type' => 'email',
         ]);
 
         // Trigger middleware by attempting login
@@ -82,7 +82,7 @@ class TwoFactorAuthenticationTest extends TestCase
 
         // Assert: Event was dispatched with a link
         Event::assertDispatched(VerificationCodeGeneratedEvent::class, function ($event) {
-            return !empty($event->link) && str_contains($event->link, '2fa/verify-link');
+            return ! empty($event->link) && str_contains($event->link, '2fa/verify-link');
         });
     }
 
@@ -101,7 +101,7 @@ class TwoFactorAuthenticationTest extends TestCase
         $response = $this->get($url);
 
         // Check for redirect (the link handler uses redirect())
-        $response->assertStatus(302); 
+        $response->assertStatus(302);
         $this->assertAuthenticatedAs($user);
         $this->assertTrue(session('2fa:verified'));
     }
@@ -112,13 +112,13 @@ class TwoFactorAuthenticationTest extends TestCase
         $user = $this->createUser([
             'two_factor_enabled' => true,
             'two_factor_secret' => encrypt('ADUM6VREBTLU72UW'),
-            'two_factor_type' => 'totp'
+            'two_factor_type' => 'totp',
         ]);
 
         session(['2fa:user_id' => $user->id]);
 
         $response = $this->postJson('/api/2fa/verify', [
-            'code' => '000000' // Incorrect code
+            'code' => '000000', // Incorrect code
         ]);
 
         $response->assertStatus(422);

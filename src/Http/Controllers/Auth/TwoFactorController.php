@@ -2,23 +2,24 @@
 
 namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 
-use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use PragmaRX\Google2FALaravel\Facade as Google2FA;
 
 class TwoFactorController extends Controller
 {
     /**
      * Verify the 2FA code (TOTP or Email/SMS)
      */
-   public function verify(Request $request)
+    public function verify(Request $request)
     {
         $userId = session('2fa:user_id');
         $contact = session('2fa:contact');
         $type = session('2fa:type');
 
-        if (!$userId) return response()->json(['message' => 'Session expired.'], 401);
+        if (! $userId) {
+            return response()->json(['message' => 'Session expired.'], 401);
+        }
 
         $user = \Whilesmart\UserAuthentication\Models\User::find($userId);
         $smartPingsService = app(\Whilesmart\UserAuthentication\Services\SmartPingsVerificationService::class);
@@ -26,21 +27,23 @@ class TwoFactorController extends Controller
         // CASE 1: TOTP
         if ($user->two_factor_type === 'totp') {
             $valid = \PragmaRX\Google2FALaravel\Facade::verifyKey($user->two_factor_secret, $request->code);
-            if (!$valid) return response()->json(['message' => 'Invalid Authenticator code.'], 422);
-        } 
+            if (! $valid) {
+                return response()->json(['message' => 'Invalid Authenticator code.'], 422);
+            }
+        }
         // CASE 2: SmartPings
         elseif ($smartPingsService->isEnabled()) {
-            if (!$smartPingsService->verify($contact, $request->code, $type)) {
+            if (! $smartPingsService->verify($contact, $request->code, $type)) {
                 return response()->json(['message' => 'Invalid SmartPings code.'], 422);
             }
-        } 
+        }
         // CASE 3: Self-Managed (Local DB)
         else {
             $codeEntry = \Whilesmart\UserAuthentication\Models\VerificationCode::where('contact', $contact)
                 ->where('purpose', "login_{$type}")
                 ->first();
 
-            if (!$codeEntry || !\Illuminate\Support\Facades\Hash::check($request->code, $codeEntry->code) || $codeEntry->isExpired()) {
+            if (! $codeEntry || ! \Illuminate\Support\Facades\Hash::check($request->code, $codeEntry->code) || $codeEntry->isExpired()) {
                 return response()->json(['message' => 'Invalid or expired code.'], 422);
             }
         }
@@ -70,6 +73,7 @@ class TwoFactorController extends Controller
         // 4. Redirect them or send a success JSON
         // Since this is likely an API package, you might redirect to your frontend dashboard
         $dashboardUrl = config('user-authentication.dashboard_url', '/dashboard');
+
         return redirect()->away($dashboardUrl);
     }
 }

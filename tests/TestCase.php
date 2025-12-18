@@ -7,14 +7,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Orchestra\Testbench\Attributes\WithMigration;
-use PragmaRX\Google2FA\Google2FA;
+use PragmaRX\Google2FALaravel\ServiceProvider as Google2FAServiceProvider;
 use Whilesmart\UserAuthentication\Events\PasswordResetCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Events\PasswordResetCompleteEvent;
 use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
 use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
-use PragmaRX\Google2FALaravel\ServiceProvider as Google2FAServiceProvider;
 
 use function Orchestra\Testbench\workbench_path;
 

@@ -3,9 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Whilesmart\UserAuthentication\Http\Controllers\Auth\AuthController;
 use Whilesmart\UserAuthentication\Http\Controllers\Auth\PasswordResetController;
-
 use Whilesmart\UserAuthentication\Http\Controllers\Auth\TwoFactorController;
-use Whilesmart\UserAuthentication\Http\Middleware\RedirectIfTwoFactorEnabled;
 
 /*
 |--------------------------------------------------------------------------

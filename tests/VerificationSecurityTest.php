@@ -7,7 +7,6 @@ use Orchestra\Testbench\Attributes\WithMigration;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
 use Whilesmart\UserAuthentication\Tests\TestCase;
 
-
 #[WithMigration]
 class VerificationSecurityTest extends TestCase
 {

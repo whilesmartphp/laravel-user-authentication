@@ -2,9 +2,9 @@
 
 namespace Whilesmart\UserAuthentication\Tests\Feature;
 
-use Whilesmart\UserAuthentication\Tests\TestCase;
-use Whilesmart\UserAuthentication\Models\User;
 use PragmaRX\Google2FALaravel\Facade as Google2FA;
+use Whilesmart\UserAuthentication\Models\User;
+use Whilesmart\UserAuthentication\Tests\TestCase;
 
 class TwoFactorVerifyTest extends TestCase
 {
@@ -15,7 +15,7 @@ class TwoFactorVerifyTest extends TestCase
         $user = User::factory()->create([
             'two_factor_secret' => encrypt($secret),
             'two_factor_enabled' => true,
-            'two_factor_type' => 'totp'
+            'two_factor_type' => 'totp',
         ]);
 
         // Put user ID in session as if they just came from the middleware
@@ -25,7 +25,7 @@ class TwoFactorVerifyTest extends TestCase
         $validCode = Google2FA::getCurrentOtp($secret);
 
         $response = $this->postJson('/api/2fa/verify', [
-            'code' => $validCode
+            'code' => $validCode,
         ]);
 
         $response->assertStatus(200);
