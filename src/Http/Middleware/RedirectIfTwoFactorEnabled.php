@@ -28,7 +28,7 @@ class RedirectIfTwoFactorEnabled
                 $service->sendVerification($contact, $type);
             } else {
                 // Self-Managed fallback (Logic from your AuthController)
-                $this->sendSelfManagedCode($contact, $type);
+                $this->sendSelfManagedCode($contact, $type, $userId);
             }
 
             Auth::logout();
@@ -49,7 +49,7 @@ class RedirectIfTwoFactorEnabled
     /**
      * Replicating the "Self-Managed" logic from your AuthController
      */
-    protected function sendSelfManagedCode($contact, $type)
+    protected function sendSelfManagedCode($contact, $type, $userId)
     {
         $codeLength = config('user-authentication.verification.code_length', 6);
         $code = str_pad(random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
@@ -65,7 +65,7 @@ class RedirectIfTwoFactorEnabled
         $magicLink = \Illuminate\Support\Facades\URL::temporarySignedRoute(
             '2fa.verify.link',
             now()->addMinutes(15),
-            ['user' => $user->id]
+            ['user' => $userId]
         );
 
         \Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent::dispatch($contact, $code, "login_{$type}", $type, $magicLink);
