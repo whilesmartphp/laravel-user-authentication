@@ -12,7 +12,7 @@ use Whilesmart\UserAuthentication\Tests\TestCase;
 class TwoFactorAuthenticationTest extends TestCase
 {
     /** @test */
-    public function middleware_intercepts_login_when_2fa_is_enabled()
+    public function test_middleware_intercepts_login_when_2fa_is_enabled()
     {
         $user = $this->createUser([
             'two_factor_enabled' => true,
@@ -38,9 +38,9 @@ class TwoFactorAuthenticationTest extends TestCase
     }
 
     /** @test */
-    public function it_can_verify_a_valid_totp_code()
+    public function test_it_can_verify_a_valid_totp_code()
     {
-        $secret = 'ADUM6VREBTLU72UW';
+        $secret = 'KVKFKRJTMR2G6KBV';
         $user = $this->createUser([
             'two_factor_enabled' => true,
             'two_factor_secret' => encrypt($secret),
@@ -65,7 +65,7 @@ class TwoFactorAuthenticationTest extends TestCase
     }
 
     /** @test */
-    public function it_sends_magic_link_for_email_2fa()
+    public function test_it_sends_magic_link_for_email_2fa()
     {
         Event::fake();
 
@@ -87,7 +87,7 @@ class TwoFactorAuthenticationTest extends TestCase
     }
 
     /** @test */
-    public function it_authenticates_via_magic_link()
+    public function test_it_authenticates_via_magic_link()
     {
         $user = $this->createUser();
 
@@ -107,11 +107,11 @@ class TwoFactorAuthenticationTest extends TestCase
     }
 
     /** @test */
-    public function it_fails_verification_with_invalid_code()
+    public function test_it_fails_verification_with_invalid_code()
     {
         $user = $this->createUser([
             'two_factor_enabled' => true,
-            'two_factor_secret' => encrypt('ADUM6VREBTLU72UW'),
+            'two_factor_secret' => encrypt('KVKFKRJTMR2G6KBV'),
             'two_factor_type' => 'totp',
         ]);
 

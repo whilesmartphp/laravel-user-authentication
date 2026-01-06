@@ -9,10 +9,10 @@ use Whilesmart\UserAuthentication\Tests\TestCase;
 class TwoFactorMiddlewareTest extends TestCase
 {
     /** @test */
-    public function users_with_2fa_enabled_are_intercepted()
+    public function test_users_with_2fa_enabled_are_intercepted()
     {
         // 1. Create a user with 2FA enabled
-        $user = User::factory()->create([
+        $user = $this->createUser([
             'two_factor_enabled' => true,
             'two_factor_type' => 'totp',
         ]);

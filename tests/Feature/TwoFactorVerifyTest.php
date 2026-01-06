@@ -9,10 +9,10 @@ use Whilesmart\UserAuthentication\Tests\TestCase;
 class TwoFactorVerifyTest extends TestCase
 {
     /** @test */
-    public function it_can_verify_a_valid_totp_code()
+    public function test_it_can_verify_a_valid_totp_code()
     {
-        $secret = 'ADUM6VREBTLU72UW'; // Example secret
-        $user = User::factory()->create([
+        $secret = 'KVKFKRJTMR2G6KBV'; // Example secret
+        $user = $this->createUser([
             'two_factor_secret' => encrypt($secret),
             'two_factor_enabled' => true,
             'two_factor_type' => 'totp',

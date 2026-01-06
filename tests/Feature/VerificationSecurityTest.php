@@ -20,7 +20,7 @@ class VerificationSecurityTest extends TestCase
     ];
 
     /** @test */
-    public function verification_code_send_is_rate_limited_by_contact()
+    public function test_verification_code_send_is_rate_limited_by_contact()
     {
         Config::set('user-authentication.verification.rate_limit_attempts', 2);
         Config::set('user-authentication.verification.rate_limit_minutes', 5);
@@ -45,7 +45,7 @@ class VerificationSecurityTest extends TestCase
     }
 
     /** @test */
-    public function expired_verification_codes_are_cleaned_up()
+    public function test_expired_verification_codes_are_cleaned_up()
     {
         // Create some expired codes
         VerificationCode::create([
@@ -79,7 +79,7 @@ class VerificationSecurityTest extends TestCase
     }
 
     /** @test */
-    public function registration_bypasses_verification_when_disabled_via_env()
+    public function test_registration_bypasses_verification_when_disabled_via_env()
     {
         // Test that env variables are properly respected
         Config::set('user-authentication.verification.require_email_verification', false);
@@ -91,7 +91,7 @@ class VerificationSecurityTest extends TestCase
     }
 
     /** @test */
-    public function registration_enforces_verification_when_enabled_via_env()
+    public function test_registration_enforces_verification_when_enabled_via_env()
     {
         // Test that env variables are properly respected
         Config::set('user-authentication.verification.require_email_verification', true);
@@ -108,7 +108,7 @@ class VerificationSecurityTest extends TestCase
     }
 
     /** @test */
-    public function smartpings_fallback_throws_exception_when_credentials_missing()
+    public function test_smartpings_fallback_throws_exception_when_credentials_missing()
     {
         // Enable SmartPings but don't provide credentials
         Config::set('user-authentication.verification.provider', 'smartpings');
@@ -124,7 +124,7 @@ class VerificationSecurityTest extends TestCase
     }
 
     /** @test */
-    public function registration_is_completely_blocked_when_verification_required_and_not_completed()
+    public function test_registration_is_completely_blocked_when_verification_required_and_not_completed()
     {
         // CRITICAL SECURITY TEST: Ensure no bypass is possible
         Config::set('user-authentication.verification.require_email_verification', true);
@@ -160,7 +160,7 @@ class VerificationSecurityTest extends TestCase
     }
 
     /** @test */
-    public function two_step_verification_requires_both_send_and_verify_steps()
+    public function test_two_step_verification_requires_both_send_and_verify_steps()
     {
         Config::set('user-authentication.verification.require_email_verification', true);
 
@@ -211,7 +211,7 @@ class VerificationSecurityTest extends TestCase
     }
 
     /** @test */
-    public function verification_security_prevents_timing_attacks()
+    public function test_verification_security_prevents_timing_attacks()
     {
         Config::set('user-authentication.verification.require_email_verification', true);
 
@@ -243,7 +243,7 @@ class VerificationSecurityTest extends TestCase
     }
 
     /** @test */
-    public function verification_codes_have_proper_expiration_enforcement()
+    public function test_verification_codes_have_proper_expiration_enforcement()
     {
         Config::set('user-authentication.verification.require_email_verification', true);
         Config::set('user-authentication.verification.code_expiry_minutes', 5);

@@ -9,9 +9,10 @@ use Whilesmart\UserAuthentication\Tests\TestCase;
 class MagicLinkTest extends TestCase
 {
     /** @test */
-    public function it_authenticates_user_via_signed_magic_link()
+    public function test_it_authenticates_user_via_signed_magic_link()
     {
-        $user = User::factory()->create();
+        // $user = User::factory()->create();
+        $user = $this->createUser();
 
         // Generate a valid signed URL
         $url = URL::temporarySignedRoute(
