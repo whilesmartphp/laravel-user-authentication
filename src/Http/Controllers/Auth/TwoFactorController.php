@@ -27,7 +27,7 @@ class TwoFactorController extends Controller
 
         // CASE 1: TOTP
         if ($user->two_factor_type === 'totp') {
-            $valid = \PragmaRX\Google2FALaravel\Facade::verifyKey($user->two_factor_secret, $request->code);
+            $valid = \PragmaRX\Google2FALaravel\Facade::verifyKey(decrypt($user->two_factor_secret), $request->code);
             if (! $valid) {
                 return response()->json(['message' => 'Invalid Authenticator code.'], 422);
             }
@@ -50,11 +50,16 @@ class TwoFactorController extends Controller
         }
 
         // AUTH SUCCESS
-        Auth::login($user);
+        // Auth::login($user);
+        // session()->forget(['2fa:user_id', '2fa:contact', '2fa:type']);
+        // session(['2fa:verified' => true]);
+
+        $token = $user->createToken('auth-token')->plainTextToken;
         session()->forget(['2fa:user_id', '2fa:contact', '2fa:type']);
         session(['2fa:verified' => true]);
 
-        return response()->json(['message' => 'Authenticated successfully.']);
+        return response()->json(['message' => 'Authenticated successfully.', 'token' => $token]);
+
     }
 
     public function verifyLink(Request $request)

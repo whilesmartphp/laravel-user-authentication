@@ -47,7 +47,7 @@ class RedirectIfTwoFactorEnabled
     }
 
     /**
-     * Replicating the "Self-Managed" logic from your AuthController
+     * Replicating the "Self-Managed" logic from AuthController
      */
     protected function sendSelfManagedCode($contact, $type, $userId)
     {

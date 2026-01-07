@@ -132,6 +132,36 @@ class AuthController extends Controller
                 return $this->runAfterHooks($request, $response, HookAction::LOGIN);
             }
 
+            // FORCE reload the user from the database using your package model
+            $UserModel = config('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
+            $user = $UserModel::find(auth()->id());
+
+            if ($user->two_factor_enabled) {
+                $userId = $user->id;
+                $type = $user->two_factor_type ?? 'totp';
+                $contact = ($type === 'phone') ? $user->phone : $user->email;
+
+                // Dispatch event for email/phone links if needed
+                if ($type !== 'totp') {
+                    $magicLink = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                        '2fa.verify.link',
+                        now()->addMinutes(15),
+                        ['user' => $userId]
+                    );
+                    \Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent::dispatch(
+                        $contact, null, "login_{$type}", $type, $magicLink
+                    );
+                }
+
+                auth()->logout();
+                session(['2fa:user_id' => $userId, '2fa:contact' => $contact, '2fa:type' => $type]);
+
+                return $this->failure('Two-factor authentication required.', 403, [
+                    'two_factor_required' => true,
+                    'method' => $type,
+                ]);
+            }
+
             UserLoggedInEvent::dispatch($user);
 
             $response = $this->success([

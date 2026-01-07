@@ -43,4 +43,22 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
             Google2FAServiceProvider::class,
         ];
     }
+
+    protected function getEnvironmentSetUp($app)
+    {
+        // Use your package's User model for authentication
+        $app['config']->set('auth.providers.users.model', \Whilesmart\UserAuthentication\Models\User::class);
+        $app['config']->set('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
+
+        // Crucial for DecryptException: Set a stable key
+        $app['config']->set('app.key', 'base64:yl96S6X6X6X6X6X6X6X6X6X6X6X6X6X6X6X6X6X6X6=');
+    }
+
+    protected function defineRoutes($router)
+    {
+        $router->get('/api/user-profile', function () {
+            return response()->json(['message' => 'Access Granted']);
+        })->middleware(['web', 'auth', \Whilesmart\UserAuthentication\Http\Middleware\RedirectIfTwoFactorEnabled::class]);
+
+    }
 }
