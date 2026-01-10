@@ -74,6 +74,10 @@ class AuthController extends Controller
             $user_data = $request->only(['first_name', 'last_name', 'email', 'password', 'phone', 'username']);
             $user_data['password'] = Hash::make($request->password);
 
+            if ($requireEmailVerification) {
+                $user_data['email_verified_at'] = now();
+            }
+
             $User = config('user-authentication.user_model', User::class);
             $user = $User::create($user_data);
             UserRegisteredEvent::dispatch($user);
@@ -455,6 +459,7 @@ class AuthController extends Controller
                 'first_name' => $name,
                 'email' => $email,
                 'password' => Hash::make(Str::random(10)),
+                'email_verified_at' => now(),
             ];
             $existing_user = $User::create($user_data);
             UserRegisteredEvent::dispatch($existing_user);
