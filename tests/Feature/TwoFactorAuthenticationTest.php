@@ -12,16 +12,13 @@ class TwoFactorAuthenticationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // Generate a valid 32-byte key for AES-256-CBC
-        $this->app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
-        $this->app['config']->set('auth.providers.users.model', User::class);
     }
 
     /** @test */
     public function test_middleware_intercepts_login_when_2fa_is_enabled()
     {
         $user = User::create([
-            'first_name' => 'Test', // Added to fix QueryException
+            'first_name' => 'Test',
             'email' => '2fa-test@example.com',
             'password' => bcrypt('password123'),
             'two_factor_enabled' => true,
@@ -34,7 +31,13 @@ class TwoFactorAuthenticationTest extends TestCase
         ]);
 
         $response->assertStatus(403)
-            ->assertJson(['two_factor_required' => true]);
+            // ->assertJson(['two_factor_required' => true]);
+            ->assertJson([
+                'errors' => [
+                    'two_factor_required' => true,
+                    'method' => 'totp',
+                ],
+            ]);
 
         $this->assertFalse(Auth::check());
     }
@@ -55,11 +58,12 @@ class TwoFactorAuthenticationTest extends TestCase
         session(['2fa:user_id' => $user->id, '2fa:type' => 'totp']);
 
         $validCode = Google2FA::getCurrentOtp($secret);
+        dump('Generated valid TOTP code: '.$validCode);
 
         $response = $this->postJson('/api/2fa/verify', [
             'code' => $validCode,
         ]);
-
+        dump('Response: '.print_r($response->json(), true));
         $response->assertStatus(200);
         $this->assertAuthenticatedAs($user);
     }

@@ -46,12 +46,11 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
 
     protected function getEnvironmentSetUp($app)
     {
-        // Use your package's User model for authentication
-        $app['config']->set('auth.providers.users.model', \Whilesmart\UserAuthentication\Models\User::class);
-        $app['config']->set('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
+        // Use a hardcoded key string
+        $app['config']->set('app.key', 'base64:u8699SXL9N99Fz3E1lV9f8R96789012345678901234=');
 
-        // Crucial for DecryptException: Set a stable key
-        $app['config']->set('app.key', 'base64:yl96S6X6X6X6X6X6X6X6X6X6X6X6X6X6X6X6X6X6X6=');
+        // Also, ensure the session driver is 'array' for testing to avoid the Cookie error
+        $app['config']->set('session.driver', 'array');
     }
 
     protected function defineRoutes($router)

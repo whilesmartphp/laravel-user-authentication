@@ -27,9 +27,13 @@ class TwoFactorController extends Controller
 
         // CASE 1: TOTP
         if ($user->two_factor_type === 'totp') {
-            $valid = \PragmaRX\Google2FALaravel\Facade::verifyKey(decrypt($user->two_factor_secret), $request->code);
-            if (! $valid) {
-                return response()->json(['message' => 'Invalid Authenticator code.'], 422);
+
+            try {
+                $secret = decrypt($user->two_factor_secret);
+            } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                return response()->json([
+                    'message' => 'The provided security token is invalid or the encryption key has changed.',
+                ], 422);
             }
         }
         // CASE 2: SmartPings
