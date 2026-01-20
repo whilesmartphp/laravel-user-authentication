@@ -29,6 +29,7 @@ class User extends Authenticatable
         'two_factor_enabled',
         'two_factor_confirmed_at',
 
+        'email_verified_at',
     ];
 
     /**
