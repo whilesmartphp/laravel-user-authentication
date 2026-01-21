@@ -51,6 +51,17 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
 
         // Also, ensure the session driver is 'array' for testing to avoid the Cookie error
         $app['config']->set('session.driver', 'array');
+
+        $app->singleton('encrypter', function ($app) {
+            $config = $app->make('config')->get('app');
+            $key = $config['key'];
+
+            if (str_starts_with($key, 'base64:')) {
+                $key = base64_decode(substr($key, 7));
+            }
+
+            return new \Illuminate\Encryption\Encrypter($key, $config['cipher']);
+        });
     }
 
     protected function defineRoutes($router)

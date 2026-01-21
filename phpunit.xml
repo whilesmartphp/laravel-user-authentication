@@ -4,7 +4,9 @@
          colors="true"
 >
     <php>
-        <env name="APP_KEY" value="AckfSECXIvnK5r28GVIWUAxmbBSjTsmF"/>
+        <env name="APP_KEY" value="base64:u8699SXL9N99Fz3E1lV9f8R96789012345678901234="/>
+        <env name="SESSION_DRIVER" value="array"/>
+
     </php>
     <testsuites>
         <testsuite name="Test Suite">

@@ -2,7 +2,6 @@
 
 namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 
-// use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
@@ -29,7 +28,15 @@ class TwoFactorController extends Controller
         if ($user->two_factor_type === 'totp') {
 
             try {
-                $secret = decrypt($user->two_factor_secret);
+                
+                $valid = \PragmaRX\Google2FALaravel\Facade::verifyKey(
+                    decrypt($user->two_factor_secret),
+                    $request->code
+                );
+                // Check if valid
+                if (! $valid) {
+                    return response()->json(['message' => 'Invalid code.'], 422);
+                }
             } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
                 return response()->json([
                     'message' => 'The provided security token is invalid or the encryption key has changed.',
@@ -54,10 +61,7 @@ class TwoFactorController extends Controller
         }
 
         // AUTH SUCCESS
-        // Auth::login($user);
-        // session()->forget(['2fa:user_id', '2fa:contact', '2fa:type']);
-        // session(['2fa:verified' => true]);
-
+        Auth::login($user);  // Uncomment this to log in the user (required for test assertions)
         $token = $user->createToken('auth-token')->plainTextToken;
         session()->forget(['2fa:user_id', '2fa:contact', '2fa:type']);
         session(['2fa:verified' => true]);

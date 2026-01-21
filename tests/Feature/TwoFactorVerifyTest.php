@@ -7,12 +7,6 @@ use Whilesmart\UserAuthentication\Tests\TestCase;
 
 class TwoFactorVerifyTest extends TestCase
 {
-    protected function getEnvironmentSetUp($app)
-    {
-        // This ensures the key is consistent for the ENTIRE app lifecycle
-        $app['config']->set('app.key', 'base64:u8699SXL9N99Fz3E1lV9f8R96789012345678901234=');
-    }
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -21,7 +15,7 @@ class TwoFactorVerifyTest extends TestCase
     /** @test */
     public function test_it_can_verify_a_valid_totp_code()
     {
-        $secret = 'KVKFKRJTMR2G6KBV'; // Example secret
+        $secret = 'KVKFKRJTMR2G6KBV';
 
         dump('Test app key:'.config('app.key'));
 
@@ -46,8 +40,8 @@ class TwoFactorVerifyTest extends TestCase
             'code' => $validCode,
         ]);
 
-        // If it's a 500, this will dump the error message to your terminal
-        if ($response->status() === 500) {
+        // If it's not successful, this will dump the error message to your terminal
+        if ($response->status() !== 200) {
             dump('ERROR: Decryption failed. Key in config is: '.config('app.key'));
             dump($response->json());
         }
