@@ -390,7 +390,9 @@ class AuthController extends Controller
         $purpose = 'registration_'.$type;
         $errorMessage = ucfirst($type).' verification required. Please verify your '.$type.' first.';
 
-        if ($smartPingsService->isEnabled()) {
+        $useSelfManaged = config('user-authentication.verification.self_managed', true);
+
+        if (! $useSelfManaged && $smartPingsService->isEnabled()) {
             if (! $smartPingsService->isVerified($contact, $type)) {
                 $response = $this->failure($errorMessage, 422);
 
