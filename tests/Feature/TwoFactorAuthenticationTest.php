@@ -58,12 +58,10 @@ class TwoFactorAuthenticationTest extends TestCase
         session(['2fa:user_id' => $user->id, '2fa:type' => 'totp']);
 
         $validCode = Google2FA::getCurrentOtp($secret);
-        dump('Generated valid TOTP code: '.$validCode);
 
         $response = $this->postJson('/api/2fa/verify', [
             'code' => $validCode,
         ]);
-        dump('Response: '.print_r($response->json(), true));
         $response->assertStatus(200);
         $this->assertAuthenticatedAs($user);
     }

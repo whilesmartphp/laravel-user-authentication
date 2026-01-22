@@ -28,7 +28,7 @@ class TwoFactorController extends Controller
         if ($user->two_factor_type === 'totp') {
 
             try {
-                
+
                 $valid = \PragmaRX\Google2FALaravel\Facade::verifyKey(
                     decrypt($user->two_factor_secret),
                     $request->code

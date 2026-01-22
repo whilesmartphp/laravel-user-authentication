@@ -17,15 +17,12 @@ class TwoFactorVerifyTest extends TestCase
     {
         $secret = 'KVKFKRJTMR2G6KBV';
 
-        dump('Test app key:'.config('app.key'));
-
         $user = $this->createUser([
             'two_factor_secret' => encrypt($secret),
             'two_factor_enabled' => true,
             'two_factor_type' => 'totp',
         ]);
 
-        dump('secret stored for user (encrypted): '.$user->two_factor_secret);
         $this->withSession([
             '2fa:user_id' => $user->id,
             '2fa:type' => 'totp',
@@ -34,7 +31,6 @@ class TwoFactorVerifyTest extends TestCase
 
         // Generate a real valid code using the secret
         $validCode = Google2FA::getCurrentOtp($secret);
-        dump('Generated valid TOTP code: '.$validCode);
 
         $response = $this->postJson('/api/2fa/verify', [
             'code' => $validCode,
