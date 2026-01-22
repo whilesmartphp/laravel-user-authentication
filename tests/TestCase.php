@@ -16,6 +16,14 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Default safe config for every test
+        config()->set('user-authentication.verification.require_email_verification', false);
+    }
+
     protected function createUser(array $attributes = []): User
     {
         return User::create(array_merge([

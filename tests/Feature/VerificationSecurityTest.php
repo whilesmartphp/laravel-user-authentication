@@ -202,6 +202,15 @@ class VerificationSecurityTest extends TestCase
             'type' => 'email',
             'purpose' => 'registration',
         ]);
+
+        $verifiedCode = VerificationCode::where('contact', 'test@example.com')->first();
+
+        $this->assertNotNull($verifiedCode, 'Verification code record missing after verification');
+        $this->assertNotNull(
+            $verifiedCode->verified_at,
+            'Verification code was not marked as verified'
+        );
+
         $response->assertStatus(200);
 
         // Step 5: Now registration should succeed
