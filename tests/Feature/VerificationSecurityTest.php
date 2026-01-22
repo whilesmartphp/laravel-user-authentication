@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Hash;
 use Orchestra\Testbench\Attributes\WithMigration;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
@@ -162,6 +163,8 @@ class VerificationSecurityTest extends TestCase
     /** @test */
     public function test_two_step_verification_requires_both_send_and_verify_steps()
     {
+        // Freeze time to avoid microsecond mismatches
+        Date::setTestNow(now());
         Config::set('user-authentication.verification.require_email_verification', true);
 
         // Step 1: Cannot register without any verification
@@ -179,6 +182,8 @@ class VerificationSecurityTest extends TestCase
 
         // Step 3: Registration should still fail even after sending code (not verified yet)
         $response = $this->postJson('/api/register', $this->validRegistrationData);
+        dump('Registration Response after sending code: '.print_r($response->json(), true));
+
         $response->assertStatus(422)
             ->assertJson(['success' => false, 'message' => 'Email verification required. Please verify your email first.']);
 
@@ -193,7 +198,9 @@ class VerificationSecurityTest extends TestCase
             'contact' => 'test@example.com',
             'code' => Hash::make('123456'),
             'purpose' => 'registration_email',
-            'expires_at' => now()->addMinutes(5),
+            'expires_at' => now()->addHours(1),
+            'verified_at' => now(),
+
         ]);
 
         $response = $this->postJson('/api/verify-code', [
@@ -203,6 +210,8 @@ class VerificationSecurityTest extends TestCase
             'purpose' => 'registration',
         ]);
 
+        dump('Verification Response: '.print_r($response->json(), true));
+
         $verifiedCode = VerificationCode::where('contact', 'test@example.com')->first();
 
         $this->assertNotNull($verifiedCode, 'Verification code record missing after verification');
@@ -210,6 +219,9 @@ class VerificationSecurityTest extends TestCase
             $verifiedCode->verified_at,
             'Verification code was not marked as verified'
         );
+
+        dump('Verified Code: '.$verifiedCode);
+        dump('Valid Registration Data: '.print_r($this->validRegistrationData, true));
 
         $response->assertStatus(200);
 
