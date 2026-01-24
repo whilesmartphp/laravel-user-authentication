@@ -234,7 +234,7 @@ class AuthController extends Controller
             'token' => $existing_user->createToken('auth-token')->plainTextToken,
         ];
 
-        $response = $this->success($response, 'User authenticated successfully', 200);
+        $response = $this->success($response, 'User authenticated successfully', 201);
 
         return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
 
@@ -494,8 +494,18 @@ class AuthController extends Controller
             UserLoggedInEvent::dispatch($existing_user);
             $this->info("User with email $email just logged in via social auth");
         } else {
+            // Split name to individual names
+            $split_names = explode(' ', $name);
+            $first_name = $split_names[0];
+            $last_names = '';
+            if (count($split_names) > 1) {
+                array_shift($split_names);
+                $last_names = implode(' ', $split_names);
+            }
+
             $user_data = [
-                'first_name' => $name,
+                'first_name' => $first_name,
+                'last_name' => $last_names,
                 'email' => $email,
                 'password' => Hash::make(Str::random(10)),
                 'email_verified_at' => now(),

@@ -4,6 +4,8 @@ use Faker\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\SocialiteServiceProvider;
 use Orchestra\Testbench\Attributes\WithMigration;
 use Whilesmart\UserAuthentication\Events\PasswordResetCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Events\PasswordResetCompleteEvent;
@@ -760,6 +762,30 @@ class TestCase extends \Orchestra\Testbench\TestCase
             ]);
     }
 
+    public function test_user_can_authenticate_with_social_auth()
+    {
+
+        $abstractUser = Mockery::mock('Laravel\Socialite\Two\User');
+        $abstractUser->shouldReceive('getId')->andReturn(rand());
+        $abstractUser->shouldReceive('getName')->andReturn('John Doe');
+        $abstractUser->shouldReceive('getEmail')->andReturn('john.doe@example.com');
+        $abstractUser->shouldReceive('getAvatar')->andReturn('https://en.gravatar.com/userimage');
+        $abstractUser->shouldReceive('token')->andReturn('fake-token');
+
+        Socialite::shouldReceive('driver->stateless->user')->andReturn($abstractUser);
+        $response = $this->get('api/oauth/github/callback');
+
+        //        $response->assertRedirect('/'); // Assert it redirects to your intended page
+        $this->assertDatabaseHas('users', [
+            'email' => 'john.doe@example.com',
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+        ]); // Assert user creation/login in your database
+
+        Mockery::close();
+
+    }
+
     /**
      * Define database migrations.
      *
@@ -782,6 +808,15 @@ class TestCase extends \Orchestra\Testbench\TestCase
     {
         return [
             'Whilesmart\UserAuthentication\UserAuthenticationServiceProvider',
+            SocialiteServiceProvider::class,
+
+        ];
+    }
+
+    protected function getPackageAliases($app)
+    {
+        return [
+            'Socialite' => Socialite::class,
         ];
     }
 }
