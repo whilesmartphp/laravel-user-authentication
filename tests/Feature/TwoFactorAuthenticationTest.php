@@ -30,15 +30,16 @@ class TwoFactorAuthenticationTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $response->assertStatus(403)
-            // ->assertJson(['two_factor_required' => true]);
-            ->assertJson([
-                'errors' => [
-                    'two_factor_required' => true,
-                    'method' => 'totp',
-                ],
-            ]);
-
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'message' => 'Two-factor authentication required.',
+            'data' => [
+                'two_factor_required' => true,
+                'method' => 'totp',
+            ],
+        ]);
+        // Ensure the user remains unauthenticated/not logged in
         $this->assertFalse(Auth::check());
     }
 

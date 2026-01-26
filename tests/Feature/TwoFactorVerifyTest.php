@@ -36,11 +36,6 @@ class TwoFactorVerifyTest extends TestCase
             'code' => $validCode,
         ]);
 
-        // If it's not successful, this will dump the error message to your terminal
-        if ($response->status() !== 200) {
-            dump('ERROR: Decryption failed. Key in config is: '.config('app.key'));
-            dump($response->json());
-        }
         $response->assertStatus(200);
         // $this->assertEquals($user->id, auth()->id());
         $this->assertAuthenticatedAs($user);

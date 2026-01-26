@@ -160,10 +160,10 @@ class AuthController extends Controller
                 auth()->logout();
                 session(['2fa:user_id' => $userId, '2fa:contact' => $contact, '2fa:type' => $type]);
 
-                return $this->failure('Two-factor authentication required.', 403, [
+                return $this->success([
                     'two_factor_required' => true,
                     'method' => $type,
-                ]);
+                ], 'Two-factor authentication required.', 200);
             }
 
             UserLoggedInEvent::dispatch($user);
@@ -503,5 +503,37 @@ class AuthController extends Controller
         ]);
 
         return $existing_user;
+    }
+
+    /**
+     * Resend the 2FA verification code by calling the existing internal method.
+     *
+     * @return \Illuminate\Http\Response|\Illuminate\Contracts\Routing\ResponseFactory
+     */
+    public function resend(Request $request)
+    {
+        $userId = session('2fa:user_id');
+        $contact = session('2fa:contact');
+        $type = session('2fa:type');
+
+        if (! $userId) {
+            return $this->failure('Session expired.', 401);
+        }
+
+        if ($type === 'totp') {
+            return $this->failure('Resend not applicable for this 2FA type.', 400);
+        }
+
+        // Prepare a temporary request object to pass to sendVerificationCode
+        // This reuses all your existing logic including Rate Limiting!
+        $subRequest = new Request;
+        $subRequest->replace([
+            'contact' => $contact,
+            'type' => $type,
+            'purpose' => 'login', // This matches the "login_{$type}" format in your code
+        ]);
+
+        // Internal call to the existing method in this same class
+        return $this->sendVerificationCode($subRequest);
     }
 }
