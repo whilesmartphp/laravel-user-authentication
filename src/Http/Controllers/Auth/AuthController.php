@@ -26,6 +26,7 @@ use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
+use Whilesmart\UserAuthentication\Services\TwoFactorService;
 
 class AuthController extends Controller
 {
@@ -136,26 +137,17 @@ class AuthController extends Controller
                 return $this->runAfterHooks($request, $response, HookAction::LOGIN);
             }
 
-            // FORCE reload the user from the database using your package model
+            // FORCE reload the user from the database using package model
             $UserModel = config('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
             $user = $UserModel::find(auth()->id());
 
-            if ($user->two_factor_enabled) {
+            if ($user->twoFactorAuth->is_enabled) {
                 $userId = $user->id;
-                $type = $user->two_factor_type ?? 'totp';
+                $type = $user->twoFactorAuth->type ?? 'totp';
                 $contact = ($type === 'phone') ? $user->phone : $user->email;
 
-                // Dispatch event for email/phone links if needed
-                if ($type !== 'totp') {
-                    $magicLink = \Illuminate\Support\Facades\URL::temporarySignedRoute(
-                        '2fa.verify.link',
-                        now()->addMinutes(15),
-                        ['user' => $userId]
-                    );
-                    \Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent::dispatch(
-                        $contact, null, "login_{$type}", $type, $magicLink
-                    );
-                }
+                // Call the Service
+                app(TwoFactorService::class)->handleChallenge($user, $type, $contact);
 
                 auth()->logout();
                 session(['2fa:user_id' => $userId, '2fa:contact' => $contact, '2fa:type' => $type]);
@@ -510,30 +502,30 @@ class AuthController extends Controller
      *
      * @return \Illuminate\Http\Response|\Illuminate\Contracts\Routing\ResponseFactory
      */
-    public function resend(Request $request)
-    {
-        $userId = session('2fa:user_id');
-        $contact = session('2fa:contact');
-        $type = session('2fa:type');
+    // public function resend(Request $request)
+    // {
+    //     $userId = session('2fa:user_id');
+    //     $contact = session('2fa:contact');
+    //     $type = session('2fa:type');
 
-        if (! $userId) {
-            return $this->failure('Session expired.', 401);
-        }
+    //     if (! $userId) {
+    //         return $this->failure('Session expired.', 401);
+    //     }
 
-        if ($type === 'totp') {
-            return $this->failure('Resend not applicable for this 2FA type.', 400);
-        }
+    //     if ($type === 'totp') {
+    //         return $this->failure('Resend not applicable for this 2FA type.', 400);
+    //     }
 
-        // Prepare a temporary request object to pass to sendVerificationCode
-        // This reuses all your existing logic including Rate Limiting!
-        $subRequest = new Request;
-        $subRequest->replace([
-            'contact' => $contact,
-            'type' => $type,
-            'purpose' => 'login', // This matches the "login_{$type}" format in your code
-        ]);
+    //     // Prepare a temporary request object to pass to sendVerificationCode
+    //     // This reuses all your existing logic including Rate Limiting!
+    //     $subRequest = new Request;
+    //     $subRequest->replace([
+    //         'contact' => $contact,
+    //         'type' => $type,
+    //         'purpose' => 'login', // This matches the "login_{$type}" format in your code
+    //     ]);
 
-        // Internal call to the existing method in this same class
-        return $this->sendVerificationCode($subRequest);
-    }
+    //     // Internal call to the existing method in this same class
+    //     return $this->sendVerificationCode($subRequest);
+    // }
 }

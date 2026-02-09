@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-
+use Whilesmart\UserAuthentication\Traits\HasTwoFactorAuth;
+use Whilesmart\UserAuthentication\Traits\ApiResponse;
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, HasTwoFactorAuth, ApiResponse;
 
     /**
      * The attributes that are mass assignable.
@@ -25,11 +26,6 @@ class User extends Authenticatable
         'username',
         'phone',
 
-        'two_factor_type',
-        'two_factor_enabled',
-        'two_factor_secret',
-        'two_factor_confirmed_at',
-
         'email_verified_at',
     ];
 
@@ -41,8 +37,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-        'two_factor_secret',
-        'two_factor_recovery_codes',
+    
     ];
 
     /**
@@ -55,10 +50,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'two_factor_enabled' => 'boolean',
-            'two_factor_recovery_codes' => 'array',
+        
         ];
     }
 
-    protected $guarded = [];
 }

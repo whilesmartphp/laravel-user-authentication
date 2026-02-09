@@ -30,8 +30,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 });
 
 // 2FA Routes
-Route::post('/2fa/verify', [TwoFactorController::class, 'verify']);
-Route::post('/2fa/resend', [TwoFactorController::class, 'resend']);
+Route::post('/2fa/verify', [TwoFactorController::class, 'verify'])
+     ->middleware('throttle:5,1'); // Limit to 5 attempts per minute
+Route::post('/2fa/resend', [TwoFactorController::class, 'resend'])
+     ->middleware('throttle:3,1'); // Limit to 3 resend attempts per minute
 
 // The Magic Link endpoint (GET request for the email button)
 Route::get('/2fa/verify-link/{user}', [TwoFactorController::class, 'verifyLink'])
