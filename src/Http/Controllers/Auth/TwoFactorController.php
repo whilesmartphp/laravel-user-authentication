@@ -6,9 +6,112 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Whilesmart\UserAuthentication\Services\TwoFactorService;
+use Illuminate\Support\Str;
 
 class TwoFactorController extends Controller
 {
+
+    /**
+     * setup,qr code and confirmation
+     */
+
+    public function setup(Request $request)
+    {
+        $user = $request->user();
+
+        //generate fresh secret
+        $google2fa = app('pragmarx.google2fa');
+        $secret = $google2fa->generateSecretKey();
+
+        //store it via the polymorphic relationship
+        // 'is_enabled' stays FALSE till user confirms the code from their app
+        $user->twoFactorAuth()->updateOrCreate(
+            ['authenticatable_id' => $user->id, 'authenticatable_type' => get_class($user)],
+            ['secret' => $secret, 'type' => 'totp', 'is_enabled' => false]
+        );
+
+        //provide the otpauth URI for QR code generation on the frontend
+        $qrCodeUrl = $google2fa->getQRCodeUrl(
+            config('app.name'),
+            $user->email,
+            $secret
+        );
+
+        return $this->success([
+            'secret' => $secret,
+            'qr_code_url' => $qrCodeUrl,
+            'help_text' => 'Scan the QR code with your authenticator app and enter the generated code to confirm setup.',
+        ], 'Two-factor authentication setup initiated. Please confirm with your authenticator app.');
+    }
+
+
+    /**
+     * Confirm the TOTP code during setup
+     * prevents users from accidentally locking themselves out.
+     * is_enabled only turns true if user can prove they have the correct code from their app.
+     */
+
+    public function confirm(Request $request)
+    {
+        $request->validate(['code' => 'required|string']);
+        $user = $request->user();
+
+        //check if they actually started setup
+        $twoFactor = $user->twoFactorAuth;
+        if (!$twoFactor || !$twoFactor->secret){
+            return $this->failure('2FA setup has not been initiated.', 400);
+        }
+        $google2fa = app('pragmarx.google2fa');
+
+        //verify the code provided by the user's app
+        if ($google2fa->verifyKey($twoFactor->secret, $request->code)) {
+            
+            //Generate recovery codes
+            $recoveryCodes = collect(range(1,8))->map(fn() => \Illuminate\Support\Str::random(10))->toArray();
+
+            $twoFactor->update([
+                'is_enabled' => true,
+                'confirmed_at' => now(),
+                'recovery_codes' => $recoveryCodes,
+            ]);
+
+            return $this->success([
+                'message' => 'Two-factor authentication has been enabled successfully.',
+                'recovery_codes' => $recoveryCodes,
+                'help_text' => 'Please store these recovery codes securely. They can be used to access your account if you lose access to your authenticator app.',
+            ]);
+        }
+
+        return $this->failure('Invalid code. Please try again.', 422);
+    }
+
+
+
+    /**
+     * Disable 2fa
+     */
+    public function disable(Request $request)
+    {
+        $request->validate(['code' => 'required|string']);
+        $user = $request->user();
+
+        if (!$user->hasTwoFactorEnabled()) {
+            return $this->failure('Two-factor authentication is not enabled.', 400);
+        }
+
+        $google2fa = app('pragmarx.google2fa');
+        if ($google2fa->verifyKey($user->twoFactorAuth->secret, $request->code)) {
+            $user->twoFactorAuth()->delete(); //remove the record on table
+            return $this->success(['message' => 'Two-factor authentication has been disabled.']);
+        }
+
+        return $this->failure('Invalid code. Could not disable 2FA.', 422);
+    }
+
+
+
+
+
     /**
      * Verify the 2FA code (TOTP or Email/SMS)
      */
@@ -25,26 +128,40 @@ class TwoFactorController extends Controller
         $user = \Whilesmart\UserAuthentication\Models\User::find($userId);
         $smartPingsService = app(\Whilesmart\UserAuthentication\Services\SmartPingsVerificationService::class);
 
-        // CASE 1: TOTP
+        // CASE 1: TOTP including recovery codes
         if ($user->twoFactorAuth && $user->twoFactorAuth->type === 'totp') {
 
-            try {
-
-                $valid = \PragmaRX\Google2FALaravel\Facade::verifyKey(
-                    $user->twoFactorAuth->secret, // Eloquent 'encrypted' cast handles decryption
-                    $request->code
-                );
-                // Check if valid
-                if (! $valid) {
-                    return response()->json(['message' => 'Invalid code.'], 422);
+            //recovery codes logic
+           if(strlen($request->code)>6){
+                // Might be a recovery code, check if it matches any of the valid recovery codes
+                $recoveryCodes = $user->twoFactorAuth->recovery_codes ?? [];
+                if (in_array($request->code, $recoveryCodes)) {
+                    // If it's a valid recovery code, remove it from the list so it can't be reused
+                    $updatedCodes = array_diff($recoveryCodes, [$request->code]);
+                    $user->twoFactorAuth()->update(['recovery_codes' => $updatedCodes]);
+                    return $this->completeVerification($user);
+                } else {
+                    return $this->failure('Invalid or expired code.', 422);
                 }
-            } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
-                return response()->json([
-                    'message' => 'The provided security token is invalid or the encryption key has changed.',
-                ], 422);
+            } else {
+                // Regular TOTP verification
+                try {
+                    $valid = \PragmaRX\Google2FALaravel\Facade::verifyKey(
+                        $user->twoFactorAuth->secret, // Eloquent 'encrypted' cast handles decryption
+                        $request->code
+                    );
+                    // Check if valid
+                    if (! $valid) {
+                        return response()->json(['message' => 'Invalid code.'], 422);
+                    }
+                } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                    return response()->json([
+                        'message' => 'The provided security token is invalid or the encryption key has changed.',
+                    ], 422);
+                }
             }
         }
-        // CASE 2 & 3: Handled by the Service to keep Controller thin
+        // CASE 2: Handled by the Service to keep Controller thin
         else {
             $service = app(TwoFactorService::class);
             if (! $service->verifyCode($contact, $request->code, $type)) {
@@ -53,7 +170,7 @@ class TwoFactorController extends Controller
         }
 
         // AUTH SUCCESS
-        Auth::login($user);  // Uncomment this to log in the user (required for test assertions)
+        Auth::login($user);
         $token = $user->createToken('auth-token')->plainTextToken;
         session()->forget(['2fa:user_id', '2fa:contact', '2fa:type']);
         session(['2fa:verified' => true]);

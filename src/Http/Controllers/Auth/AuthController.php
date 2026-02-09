@@ -141,7 +141,7 @@ class AuthController extends Controller
             $UserModel = config('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
             $user = $UserModel::find($user->id());
 
-            if ($user->twoFactorAuth->is_enabled) {
+            if ($user->hasTwoFactorEnabled()) {
                 $userId = $user->id;
                 $type = $user->twoFactorAuth->type ?? 'totp';
                 $contact = ($type === 'phone') ? $user->phone : $user->email;
