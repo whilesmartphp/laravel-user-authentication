@@ -26,7 +26,7 @@ class TwoFactorController extends Controller
         $smartPingsService = app(\Whilesmart\UserAuthentication\Services\SmartPingsVerificationService::class);
 
         // CASE 1: TOTP
-        if ($user->twoFactorAuth->type === 'totp') {
+        if ($user->twoFactorAuth && $user->twoFactorAuth->type === 'totp') {
 
             try {
 
@@ -75,7 +75,7 @@ class TwoFactorController extends Controller
         // 2. Find the user based on the link
         $user = $link->user;
         // 3. Log them in and set the 2FA verified flag
-        Auth::login($user);
+        Auth::guard('web')->login($user);
         
         $link->update(['is_used' => true]);
         session(['2fa:verified' => true]);

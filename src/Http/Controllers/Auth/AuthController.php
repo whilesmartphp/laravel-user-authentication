@@ -139,7 +139,7 @@ class AuthController extends Controller
 
             // FORCE reload the user from the database using package model
             $UserModel = config('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
-            $user = $UserModel::find(auth()->id());
+            $user = $UserModel::find($user->id());
 
             if ($user->twoFactorAuth->is_enabled) {
                 $userId = $user->id;
