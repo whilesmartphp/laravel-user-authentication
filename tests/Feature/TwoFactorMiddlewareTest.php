@@ -12,9 +12,11 @@ class TwoFactorMiddlewareTest extends TestCase
     public function test_users_with_2fa_enabled_are_intercepted()
     {
         // 1. Create a user with 2FA enabled
-        $user = $this->createUser([
-            'two_factor_enabled' => true,
-            'two_factor_type' => 'totp',
+        $user = $this->createUser();
+        $user->twoFactorAuth()->create([
+            'secret' => 'KVKFKRJTMR2G6KBV',
+            'type' => 'totp',
+            'is_enabled' => true,
         ]);
 
         // 2. Act as the user (simulate password login success)

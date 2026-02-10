@@ -21,8 +21,8 @@ class RedirectIfTwoFactorEnabled
             $type = ($user->twoFactorAuth->type === 'phone') ? 'phone' : 'email';
             $contact = ($type === 'phone') ? $user->phone : $user->email;
 
-           //use service
-           app(TwoFactorService::class)->handleChallenge($user, $type, $contact);
+            // use service
+            app(TwoFactorService::class)->handleChallenge($user, $type, $contact);
 
             Auth::logout();
             $request->session()->put('2fa:user_id', $userId);
@@ -38,5 +38,4 @@ class RedirectIfTwoFactorEnabled
 
         return $next($request);
     }
-
 }

@@ -28,22 +28,21 @@ Route::post('/password/reset', [PasswordResetController::class, 'resetPasswordWi
 Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('logout', [AuthController::class, 'logout']);
 
-    //2FA onboarding and management
+    // 2FA onboarding and management
     Route::prefix('2fa')->group(function () {
-        Route::post('/setup', [TwoFactorController::class, 'setup']); //start 2fa 
-        Route::post('/confirm', [TwoFactorController::class, 'confirm']); //confirm and enable 2fa
-        Route::post('/disable', [TwoFactorController::class, 'disable']); //turn off 2fa
+        Route::post('/setup', [TwoFactorController::class, 'setup']); // start 2fa
+        Route::post('/confirm', [TwoFactorController::class, 'confirm']); // confirm and enable 2fa
+        Route::post('/disable', [TwoFactorController::class, 'disable']); // turn off 2fa
     });
 });
 
 // 2FA Routes
 Route::post('/2fa/verify', [TwoFactorController::class, 'verify'])
-     ->middleware('throttle:5,1'); // Limit to 5 attempts per minute
+    ->middleware('throttle:5,1'); // Limit to 5 attempts per minute
 Route::post('/2fa/resend', [TwoFactorController::class, 'resend'])
-     ->middleware('throttle:3,1'); // Limit to 3 resend attempts per minute
+    ->middleware('throttle:3,1'); // Limit to 3 resend attempts per minute
 
 // The Magic Link endpoint (GET request for the email button)
 Route::get('/2fa/verify-link/{user}', [TwoFactorController::class, 'verifyLink'])
     ->name('2fa.verify.link')
     ->middleware('signed');
-

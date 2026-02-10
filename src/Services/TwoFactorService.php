@@ -1,14 +1,13 @@
 <?php
 
-
 namespace Whilesmart\UserAuthentication\Services;
 
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
-use Whilesmart\UserAuthentication\Models\VerificationCode;
+use Illuminate\Support\Str;
 use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Models\MagicLink;
-use Illuminate\Support\Str;
+use Whilesmart\UserAuthentication\Models\VerificationCode;
 
 class TwoFactorService
 {
@@ -26,6 +25,7 @@ class TwoFactorService
 
         if ($smartPings->isEnabled()) {
             $smartPings->sendVerification($contact, $type);
+
             return;
         }
 
@@ -48,7 +48,7 @@ class TwoFactorService
             ->where('purpose', "login_{$type}")
             ->first();
 
-        if (!$codeEntry || $codeEntry->isExpired()) {
+        if (! $codeEntry || $codeEntry->isExpired()) {
             return false;
         }
 
@@ -63,7 +63,7 @@ class TwoFactorService
         // 1. Generate the numeric code
         $codeLength = config('user-authentication.verification.code_length', 6);
         $code = str_pad(random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
-        
+
         $expiry = config('user-authentication.verification.code_expiry_minutes', 5);
 
         // 2. Persist the numeric code

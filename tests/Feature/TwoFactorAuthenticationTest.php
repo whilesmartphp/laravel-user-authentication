@@ -15,14 +15,82 @@ class TwoFactorAuthenticationTest extends TestCase
     }
 
     /** @test */
+    public function test_user_can_initiate_2fa_setup()
+    {
+        $user = $this->createUser();
+        $this->actingAs($user, 'sanctum');
+
+        $response = $this->postJson('/api/auth/2fa/setup');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure(['data' => ['secret', 'qr_code_url']]);
+
+        $this->assertDatabaseHas('two_factor_auths', [
+            'authenticatable_id' => $user->id,
+            'is_enabled' => false,
+        ]);
+    }
+
+    /** @test */
+    public function test_user_can_confirm_and_enable_2fa()
+    {
+        $user = $this->createUser();
+        $this->actingAs($user, 'sanctum');
+
+        // Create the pending record
+        $secret = 'KVKFKRJTMR2G6KBV';
+        $user->twoFactorAuth()->create([
+            'secret' => $secret, // Model cast handles encryption
+            'type' => 'totp',
+            'is_enabled' => false,
+        ]);
+
+        $validCode = Google2FA::getCurrentOtp($secret);
+
+        $response = $this->postJson('/api/auth/2fa/confirm', ['code' => $validCode]);
+
+        $response->assertStatus(200)
+            ->assertJsonStructure(['data' => ['recovery_codes']]);
+
+        $this->assertTrue($user->fresh()->hasTwoFactorEnabled());
+    }
+
+    /** @test */
+    public function test_it_can_verify_via_recovery_code()
+    {
+        $user = $this->createUser();
+        $user->twoFactorAuth()->create([
+            'secret' => 'KVKFKRJTMR2G6KBV',
+            'type' => 'totp',
+            'is_enabled' => true,
+            'recovery_codes' => ['ABCDE12345', 'XYZ789'],
+        ]);
+
+        session(['2fa:user_id' => $user->id, '2fa:type' => 'totp']);
+
+        // Try login with recovery code
+        $response = $this->postJson('/api/2fa/verify', ['code' => 'ABCDE12345']);
+
+        $response->assertStatus(200);
+        $this->assertAuthenticatedAs($user);
+
+        // Assert code was consumed (removed from DB)
+        $this->assertNotContains('ABCDE12345', $user->fresh()->twoFactorAuth->recovery_codes);
+    }
+
+    /** @test */
     public function test_middleware_intercepts_login_when_2fa_is_enabled()
     {
         $user = User::create([
             'first_name' => 'Test',
             'email' => '2fa-test@example.com',
             'password' => bcrypt('password123'),
-            'two_factor_enabled' => true,
-            'two_factor_type' => 'totp',
+        ]);
+
+        $user->twoFactorAuth()->create([
+            'type' => 'totp',
+            'is_enabled' => true,
+            'secret' => 'KVKFKRJTMR2G6KBV',
         ]);
 
         $response = $this->postJson('/api/login', [
@@ -51,9 +119,11 @@ class TwoFactorAuthenticationTest extends TestCase
             'first_name' => 'Test',
             'email' => 'totp@example.com',
             'password' => bcrypt('password123'),
-            'two_factor_enabled' => true,
-            'two_factor_secret' => encrypt($secret),
-            'two_factor_type' => 'totp',
+        ]);
+        $user->twoFactorAuth()->create([
+            'type' => 'totp',
+            'is_enabled' => true,
+            'secret' => $secret, // Cast handles encryption
         ]);
 
         session(['2fa:user_id' => $user->id, '2fa:type' => 'totp']);
@@ -75,9 +145,11 @@ class TwoFactorAuthenticationTest extends TestCase
             'first_name' => 'Test',
             'email' => 'fail@example.com',
             'password' => bcrypt('password123'),
-            'two_factor_enabled' => true,
-            'two_factor_secret' => encrypt($secret),
-            'two_factor_type' => 'totp',
+        ]);
+        $user->twoFactorAuth()->create([
+            'type' => 'totp',
+            'is_enabled' => true,
+            'secret' => $secret, // Cast handles encryption
         ]);
 
         session(['2fa:user_id' => $user->id, '2fa:type' => 'totp']);
@@ -87,5 +159,27 @@ class TwoFactorAuthenticationTest extends TestCase
         ]);
 
         $response->assertStatus(422);
+    }
+
+    /** @test */
+    public function test_it_can_verify_using_recovery_code()
+    {
+        $user = $this->createUser();
+        $user->twoFactorAuth()->create([
+            'type' => 'totp',
+            'is_enabled' => true,
+            'secret' => 'SECRET',
+            'recovery_codes' => ['ABCDE12345', 'XYZ7890123'],
+        ]);
+
+        session(['2fa:user_id' => $user->id, '2fa:type' => 'totp']);
+
+        $response = $this->postJson('/api/2fa/verify', ['code' => 'ABCDE12345']);
+
+        $response->assertStatus(200);
+        $this->assertAuthenticatedAs($user);
+
+        // Assert the code was "consumed" (Reviewer Point: Security)
+        $this->assertNotContains('ABCDE12345', $user->fresh()->twoFactorAuth->recovery_codes);
     }
 }

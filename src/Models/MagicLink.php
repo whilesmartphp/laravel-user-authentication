@@ -3,8 +3,6 @@
 namespace Whilesmart\UserAuthentication\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
 
 class MagicLink extends Model
 {
@@ -26,16 +24,15 @@ class MagicLink extends Model
         ];
     }
 
-     /**
+    /**
      * Get the user that owns the magic link.
      */
     public function user()
     {
-        // Use the config value, and fallback to your package's User model 
+        // Use the config value, and fallback to your package's User model
         // if the consumer hasn't defined one.
         return $this->belongsTo(config('user-authentication.user_model', User::class));
     }
-
 
     public function isExpired(): bool
     {
@@ -43,4 +40,3 @@ class MagicLink extends Model
         return $this->expires_at->isPast() || $this->is_used;
     }
 }
-

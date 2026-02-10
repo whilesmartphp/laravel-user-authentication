@@ -2,8 +2,8 @@
 
 namespace Whilesmart\UserAuthentication\Traits;
 
-use Whilesmart\UserAuthentication\Models\TwoFactorAuth;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Whilesmart\UserAuthentication\Models\TwoFactorAuth;
 
 trait HasTwoFactorAuth
 {

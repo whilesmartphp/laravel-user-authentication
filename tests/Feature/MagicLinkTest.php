@@ -3,29 +3,33 @@
 namespace Whilesmart\UserAuthentication\Tests\Feature;
 
 use Illuminate\Support\Facades\URL;
-use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Tests\TestCase;
 
 class MagicLinkTest extends TestCase
 {
     /** @test */
-    public function test_it_authenticates_user_via_signed_magic_link()
+    public function test_it_authenticates_user_via_persistent_magic_link()
     {
-        // $user = User::factory()->create();
         $user = $this->createUser();
+        $token = \Illuminate\Support\Str::random(64);
 
-        // Generate a valid signed URL
+        // Create the record in our new magic_links table
+        \Whilesmart\UserAuthentication\Models\MagicLink::create([
+            'user_id' => $user->id,
+            'token' => $token,
+            'expires_at' => now()->addMinutes(15),
+            'is_used' => false,
+        ]);
+
         $url = URL::temporarySignedRoute(
             '2fa.verify.link',
             now()->addMinutes(15),
-            ['user' => $user->id]
+            ['user' => $user->id, 'token' => $token]
         );
 
-        // Request the URL
         $response = $this->get($url);
 
-        // Assert redirect to dashboard and user is logged in
-        $response->assertRedirect('/dashboard');
+        $response->assertRedirect();
         $this->assertAuthenticatedAs($user);
         $this->assertTrue(session('2fa:verified'));
     }

@@ -23,10 +23,10 @@ use Whilesmart\UserAuthentication\Models\OauthAccount;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
 use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
+use Whilesmart\UserAuthentication\Services\TwoFactorService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
-use Whilesmart\UserAuthentication\Services\TwoFactorService;
 
 class AuthController extends Controller
 {
@@ -95,6 +95,15 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             $this->error($e);
 
+            // return exact error message in response for easier debugging during development, can be changed to a generic message in production
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(), // Change this to see the actual error
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
+
+            // Uncomment below lines to return a generic error message instead of the actual exception details
             $response = $this->failure('An error occurred', 500);
 
             return $this->runAfterHooks($request, $response, HookAction::REGISTER);
@@ -139,7 +148,7 @@ class AuthController extends Controller
 
             // FORCE reload the user from the database using package model
             $UserModel = config('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
-            $user = $UserModel::find($user->id());
+            $user = $UserModel::find($user->id);
 
             if ($user->hasTwoFactorEnabled()) {
                 $userId = $user->id;
@@ -168,11 +177,17 @@ class AuthController extends Controller
 
             return $this->runAfterHooks($request, $response, HookAction::LOGIN);
         } catch (\Exception $e) {
-            $this->error('An error occurred during login: '.$e->getMessage(), ['exception' => $e]);
+            // $this->error('An error occurred during login: '.$e->getMessage(), ['exception' => $e]);
 
-            $response = $this->failure('An error occurred during login', 500);
+            // $response = $this->failure('An error occurred during login', 500);
 
-            return $this->runAfterHooks($request, $response, HookAction::LOGIN);
+            // return $this->runAfterHooks($request, $response, HookAction::LOGIN);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(), // Change this to see the actual error
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
         }
     }
 

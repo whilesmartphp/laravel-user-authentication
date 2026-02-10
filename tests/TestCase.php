@@ -31,9 +31,6 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
             'password' => Hash::make('password123'),
             'first_name' => 'John',
             'last_name' => 'Doe',
-            'two_factor_enabled' => false,
-            'two_factor_secret' => null,
-            'two_factor_type' => 'totp',
         ], $attributes));
     }
 
@@ -47,6 +44,7 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
     protected function getPackageProviders($app)
     {
         return [
+            \Laravel\Sanctum\SanctumServiceProvider::class,
             'Whilesmart\UserAuthentication\UserAuthenticationServiceProvider',
             Google2FAServiceProvider::class,
         ];
@@ -59,6 +57,20 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
 
         // Also, ensure the session driver is 'array' for testing to avoid the Cookie error
         $app['config']->set('session.driver', 'array');
+
+        // Add Sanctum Guard Configuration
+        $app['config']->set('auth.guards.sanctum', [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ]);
+
+        $app['config']->set('auth.providers.users.model', \Whilesmart\UserAuthentication\Models\User::class);
+        $app['config']->set('database.default', 'testing');
+        $app['config']->set('database.connections.testing', [
+            'driver' => 'sqlite',
+            'database' => __DIR__.'/../../database.sqlite', // Point to the file you just created
+            'prefix' => '',
+        ]);
 
         $app->singleton('encrypter', function ($app) {
             $config = $app->make('config')->get('app');

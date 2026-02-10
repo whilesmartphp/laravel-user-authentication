@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('two_factor_auths', function (Blueprint $table) {
             $table->id();
-            //polymorphic columns: authenticatable_id, authenticatable_type
+            // polymorphic columns: authenticatable_id, authenticatable_type
             $table->morphs('authenticatable');
 
             $table->text('secret')->nullable();
@@ -22,7 +22,6 @@ return new class extends Migration
 
             $table->timestamp('confirmed_at')->nullable();
             $table->json('recovery_codes')->nullable();
-
 
             $table->timestamps();
         });
