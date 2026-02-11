@@ -15,6 +15,7 @@ use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Laravel\Firebase\Facades\Firebase;
 use Laravel\Socialite\Facades\Socialite;
 use Whilesmart\UserAuthentication\Enums\HookAction;
+use Whilesmart\UserAuthentication\Events\OauthUserAuthenticatedEvent;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Events\UserLoggedOutEvent;
 use Whilesmart\UserAuthentication\Events\UserRegisteredEvent;
@@ -171,7 +172,14 @@ class AuthController extends Controller
     {
         $request = $this->runBeforeHooks($request, HookAction::OAUTH_LOGIN);
 
-        $url = Socialite::driver($driver)->stateless()->redirect()->getTargetUrl();
+        $socialite = Socialite::driver($driver)->stateless();
+
+        $scopes = config("user-authentication.oauth_scopes.{$driver}", []);
+        if (! empty($scopes)) {
+            $socialite->scopes($scopes);
+        }
+
+        $url = $socialite->redirect()->getTargetUrl();
 
         $response = $this->success([
             'url' => $url,
@@ -185,7 +193,23 @@ class AuthController extends Controller
     {
         $request = $this->runBeforeHooks($request, HookAction::OAUTH_CALLBACK);
 
-        $social_user = Socialite::driver($driver)->stateless()->user();
+        try {
+            $social_user = Socialite::driver($driver)->stateless()->user();
+        } catch (\Laravel\Socialite\Two\InvalidStateException $e) {
+            $this->error("OAuth state mismatch for {$driver}");
+
+            return $this->runAfterHooks($request, $this->failure('Invalid state. Please try again.', 400), HookAction::OAUTH_CALLBACK);
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            $this->error("OAuth provider communication error for {$driver}: ".$e->getMessage());
+            $statusCode = in_array($e->getResponse()->getStatusCode(), [401, 403]) ? 401 : 400;
+
+            return $this->runAfterHooks($request, $this->failure('OAuth authentication failed', $statusCode), HookAction::OAUTH_CALLBACK);
+        } catch (\Exception $e) {
+            $this->error("OAuth callback failed for {$driver}: ".$e->getMessage());
+
+            return $this->runAfterHooks($request, $this->failure('OAuth authentication failed', 400), HookAction::OAUTH_CALLBACK);
+        }
+
         $email = $social_user->getEmail();
         $name = $social_user->getName();
 
@@ -195,7 +219,15 @@ class AuthController extends Controller
             return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
         }
 
-        $existing_user = $this->handleUserAuthentication($email, $name, $driver);
+        $oauthData = [
+            'provider_id' => $social_user->getId(),
+            'avatar_url' => $social_user->getAvatar(),
+            'token' => $social_user->token,
+        ];
+
+        [$existing_user, $isNewUser] = $this->handleUserAuthentication($email, $name, $driver, $oauthData);
+
+        OauthUserAuthenticatedEvent::dispatch($existing_user, $social_user, $driver, $isNewUser);
 
         $response = [
             'user' => $existing_user,
@@ -419,7 +451,14 @@ class AuthController extends Controller
                 }
             }
 
-            $existing_user = $this->handleUserAuthentication($email, $name, $driver);
+            $oauthData = [
+                'provider_id' => $uid,
+                'avatar_url' => $user->photoUrl,
+            ];
+
+            [$existing_user, $isNewUser] = $this->handleUserAuthentication($email, $name, $driver, $oauthData);
+
+            OauthUserAuthenticatedEvent::dispatch($existing_user, null, $driver, $isNewUser);
 
             $response = [
                 'user' => $existing_user,
@@ -443,17 +482,17 @@ class AuthController extends Controller
     }
 
     /**
-     * Private helper method to handle user authentication (login/create) and OAuth account creation.
-     *
-     * @return mixed The authenticated user instance.
+     * @return array{0: mixed, 1: bool} The authenticated user instance and whether it's a new user.
      */
-    private function handleUserAuthentication(string $email, string $name, string $driver)
+    private function handleUserAuthentication(string $email, string $name, string $driver, array $oauthData = []): array
     {
         $User = config('user-authentication.user_model', User::class);
         $existing_user = $User::where('email', $email)->first();
+        $isNewUser = false;
+
         if ($existing_user) {
             UserLoggedInEvent::dispatch($existing_user);
-            $this->info("User with email $email  just logged in via social auth ");
+            $this->info("User with email $email just logged in via social auth");
         } else {
             $user_data = [
                 'first_name' => $name,
@@ -462,14 +501,16 @@ class AuthController extends Controller
                 'email_verified_at' => now(),
             ];
             $existing_user = $User::create($user_data);
+            $isNewUser = true;
             UserRegisteredEvent::dispatch($existing_user);
             $this->info("New user with email $email just registered via social auth");
         }
-        OauthAccount::firstOrCreate([
-            'user_id' => $existing_user->id,
-            'provider' => $driver,
-        ]);
 
-        return $existing_user;
+        OauthAccount::updateOrCreate(
+            ['user_id' => $existing_user->id, 'provider' => $driver],
+            $oauthData,
+        );
+
+        return [$existing_user, $isNewUser];
     }
 }
