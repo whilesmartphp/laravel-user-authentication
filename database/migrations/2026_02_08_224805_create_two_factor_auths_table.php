@@ -21,7 +21,7 @@ return new class extends Migration
             $table->boolean('is_enabled')->default(false);
 
             $table->timestamp('confirmed_at')->nullable();
-            $table->json('recovery_codes')->nullable();
+            $table->text('recovery_codes')->nullable();
 
             $table->timestamps();
         });

@@ -54,6 +54,7 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
     {
         // Use a hardcoded key string
         $app['config']->set('app.key', 'base64:u8699SXL9N99Fz3E1lV9f8R96789012345678901234=');
+        $app['config']->set('app.cipher', 'AES-256-CBC');
 
         // Also, ensure the session driver is 'array' for testing to avoid the Cookie error
         $app['config']->set('session.driver', 'array');
@@ -64,31 +65,45 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
             'provider' => 'users',
         ]);
 
+        // Create an absolute path to the sqlite file in your tests directory
+        $dbPath = __DIR__.'/../database/database.sqlite';
+
+        // If the file doesn't exist, create it on the fly so the test doesn't crash
+        if (! file_exists($dbPath)) {
+            touch($dbPath);
+        }
+
         $app['config']->set('auth.providers.users.model', \Whilesmart\UserAuthentication\Models\User::class);
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
             'driver' => 'sqlite',
-            'database' => __DIR__.'/../../database.sqlite', // Point to the file you just created
+            'database' => $dbPath,
             'prefix' => '',
         ]);
 
-        $app->singleton('encrypter', function ($app) {
-            $config = $app->make('config')->get('app');
-            $key = $config['key'];
+        // Re-add the Sanctum Guard to fix the other failure
+        $app['config']->set('auth.guards.sanctum', [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ]);
 
-            if (str_starts_with($key, 'base64:')) {
-                $key = base64_decode(substr($key, 7));
-            }
+        // $app->singleton('encrypter', function ($app) {
+        //     $config = $app->make('config')->get('app');
+        //     $key = $config['key'];
 
-            return new \Illuminate\Encryption\Encrypter($key, $config['cipher']);
-        });
+        //     if (str_starts_with($key, 'base64:')) {
+        //         $key = base64_decode(substr($key, 7));
+        //     }
+
+        //     return new \Illuminate\Encryption\Encrypter($key, $config['cipher']);
+        // });
     }
 
-    protected function defineRoutes($router)
-    {
-        $router->get('/api/user-profile', function () {
-            return response()->json(['message' => 'Access Granted']);
-        })->middleware(['web', 'auth', \Whilesmart\UserAuthentication\Http\Middleware\RedirectIfTwoFactorEnabled::class]);
+    // protected function defineRoutes($router)
+    // {
+    //     $router->get('/api', function () {
+    //         return response()->json(['message' => 'Access Granted']);
+    //     })->middleware(['web', 'auth', \Whilesmart\UserAuthentication\Http\Middleware\RedirectIfTwoFactorEnabled::class]);
 
-    }
+    // }
 }

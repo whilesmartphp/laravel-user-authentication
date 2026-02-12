@@ -6,9 +6,12 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Whilesmart\UserAuthentication\Services\TwoFactorService;
+use Whilesmart\UserAuthentication\Traits\ApiResponse;
 
 class TwoFactorController extends Controller
 {
+    use ApiResponse;
+
     /**
      * setup,qr code and confirmation
      */

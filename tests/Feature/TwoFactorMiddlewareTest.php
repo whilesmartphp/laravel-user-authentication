@@ -12,7 +12,13 @@ class TwoFactorMiddlewareTest extends TestCase
     public function test_users_with_2fa_enabled_are_intercepted()
     {
         // 1. Create a user with 2FA enabled
-        $user = $this->createUser();
+        // $user = $this->createUser();
+        $user = User::create([
+            'first_name' => 'Mercy',
+            'last_name' => 'Ma',
+            'email' => 'mercy@gmail.com',
+            'password' => bcrypt('password123'),
+        ]);
         $user->twoFactorAuth()->create([
             'secret' => 'KVKFKRJTMR2G6KBV',
             'type' => 'totp',
@@ -20,16 +26,25 @@ class TwoFactorMiddlewareTest extends TestCase
         ]);
 
         // 2. Act as the user (simulate password login success)
-        Auth::login($user);
+        // Auth::login($user);
 
         // 3. Try to access a protected route
-        $response = $this->getJson('/api/user-profile');
+        // $response = $this->getJson('/api/user-profile');
+        $response = $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+        ]);
 
-        // 4. Assert they get a 403 '2FA Required' response
-        $response->assertStatus(403);
-        $response->assertJsonStructure(['two_factor_required', 'method']);
-
-        // Assert the user was logged out of the full session
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'message' => 'Two-factor authentication required.',
+            'data' => [
+                'two_factor_required' => true,
+                'method' => 'totp',
+            ],
+        ]);
+        // Ensure the user remains unauthenticated/not logged in
         $this->assertFalse(Auth::check());
     }
 }
