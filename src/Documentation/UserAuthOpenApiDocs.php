@@ -11,6 +11,7 @@ use OpenApi\Attributes as OA;
  * This class contains all the API documentation that can be published
  * to your application for OpenAPI spec generation without needing
  * to publish the actual controllers.
+ * @codeCoverageIgnore
  */
 #[OA\Tag(name: 'Authentication', description: 'Endpoints for user authentication')]
 class UserAuthOpenApiDocs
@@ -36,7 +37,8 @@ class UserAuthOpenApiDocs
                 name: 'driver',
                 description: 'Oauth provider name',
                 in: 'path',
-                required: true, schema: new OA\Schema(type: 'string')
+                required: true,
+                schema: new OA\Schema(type: 'string')
             ),
         ],
         responses: [
@@ -45,7 +47,12 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 400, description: 'Invalid token'),
         ]
     )]
-    public function firebaseAuthCallback(Request $request, string $driver) {}
+    /**
+     * @suppressWarnings(PHPMD.UnusedFormalParameter)
+    */
+    public function firebaseAuthCallback(Request $request, string $driver)
+    {
+    }
 
     #[OA\Post(
         path: '/register',
@@ -71,7 +78,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 422, description: 'Validation error'),
         ]
     )]
-    public function register() {}
+    public function register()
+    {
+    }
 
     #[OA\Post(
         path: '/login',
@@ -96,7 +105,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 500, description: 'Server error'),
         ]
     )]
-    public function login() {}
+    public function login()
+    {
+    }
 
     #[OA\Post(
         path: '/logout',
@@ -111,7 +122,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 500, description: 'Server error'),
         ]
     )]
-    public function logout() {}
+    public function logout()
+    {
+    }
 
     #[OA\Get(
         path: '/oauth/{driver}/login',
@@ -122,7 +135,8 @@ class UserAuthOpenApiDocs
                 name: 'driver',
                 description: 'Oauth provider name',
                 in: 'path',
-                required: true, schema: new OA\Schema(type: 'string')
+                required: true,
+                schema: new OA\Schema(type: 'string')
             ),
         ],
         responses: [
@@ -130,7 +144,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 500, description: 'Server error'),
         ]
     )]
-    public function oauthLogin() {}
+    public function oauthLogin()
+    {
+    }
 
     #[OA\Get(
         path: '/oauth/{driver}/callback',
@@ -141,7 +157,8 @@ class UserAuthOpenApiDocs
                 name: 'driver',
                 description: 'Oauth provider name',
                 in: 'path',
-                required: true, schema: new OA\Schema(type: 'string')
+                required: true,
+                schema: new OA\Schema(type: 'string')
             ),
         ],
         responses: [
@@ -149,7 +166,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 500, description: 'Server error'),
         ]
     )]
-    public function oauthCallback() {}
+    public function oauthCallback()
+    {
+    }
 
     #[OA\Post(
         path: '/send-verification-code',
@@ -160,9 +179,20 @@ class UserAuthOpenApiDocs
             content: new OA\JsonContent(
                 required: ['contact', 'type'],
                 properties: [
-                    new OA\Property(property: 'contact', type: 'string', description: 'Email address or phone number'),
-                    new OA\Property(property: 'type', type: 'string', enum: ['email', 'phone'], description: 'Type of contact'),
-                    new OA\Property(property: 'purpose', type: 'string', enum: ['registration', 'login'], description: 'Purpose of verification (optional, defaults to "registration")', example: 'registration'),
+                    new OA\Property(property: 'contact', description: 'Email address or phone number', type: 'string'),
+                    new OA\Property(
+                        property: 'type',
+                        description: 'Type of contact',
+                        type: 'string',
+                        enum: ['email', 'phone']
+                    ),
+                    new OA\Property(
+                        property: 'purpose',
+                        description: 'Purpose of verification (optional, defaults to "registration")',
+                        type: 'string',
+                        enum: ['registration', 'login'],
+                        example: 'registration'
+                    ),
                 ]
             )
         ),
@@ -173,7 +203,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 429, description: 'Too many requests'),
         ]
     )]
-    public function sendVerificationCode() {}
+    public function sendVerificationCode()
+    {
+    }
 
     #[OA\Post(
         path: '/verify-code',
@@ -184,10 +216,21 @@ class UserAuthOpenApiDocs
             content: new OA\JsonContent(
                 required: ['contact', 'code', 'type'],
                 properties: [
-                    new OA\Property(property: 'contact', type: 'string', description: 'Email address or phone number'),
-                    new OA\Property(property: 'code', type: 'string', description: 'Verification code'),
-                    new OA\Property(property: 'type', type: 'string', enum: ['email', 'phone'], description: 'Type of contact'),
-                    new OA\Property(property: 'purpose', type: 'string', enum: ['registration', 'login'], description: 'Purpose of verification (optional, defaults to "registration")', example: 'registration'),
+                    new OA\Property(property: 'contact', description: 'Email address or phone number', type: 'string'),
+                    new OA\Property(property: 'code', description: 'Verification code', type: 'string'),
+                    new OA\Property(
+                        property: 'type',
+                        description: 'Type of contact',
+                        type: 'string',
+                        enum: ['email', 'phone']
+                    ),
+                    new OA\Property(
+                        property: 'purpose',
+                        description: 'Purpose of verification (optional, defaults to "registration")',
+                        type: 'string',
+                        enum: ['registration', 'login'],
+                        example: 'registration'
+                    ),
                 ]
             )
         ),
@@ -198,5 +241,7 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 422, description: 'Validation error'),
         ]
     )]
-    public function verifyCode() {}
+    public function verifyCode()
+    {
+    }
 }

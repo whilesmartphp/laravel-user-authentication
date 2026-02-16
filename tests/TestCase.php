@@ -614,7 +614,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
             'user-authentication.verification.self_managed' => true,
         ]);
 
-        $service = new SmartPingsVerificationService;
+        $service = new SmartPingsVerificationService();
         $this->assertFalse($service->isEnabled());
     }
 
@@ -625,7 +625,7 @@ class TestCase extends \Orchestra\Testbench\TestCase
             'user-authentication.verification.self_managed' => true,
         ]);
 
-        $service = new SmartPingsVerificationService;
+        $service = new SmartPingsVerificationService();
         $result = $service->sendVerification('test@example.com', 'email');
 
         $this->assertFalse($result['success']);
