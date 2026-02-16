@@ -8,7 +8,9 @@ use Illuminate\Queue\SerializesModels;
 
 class PasswordResetCodeGeneratedEvent
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable;
+    use InteractsWithSockets;
+    use SerializesModels;
 
     /**
      * Create a new event instance.
@@ -16,5 +18,6 @@ class PasswordResetCodeGeneratedEvent
     public function __construct(
         public string $email,
         public string $code
-    ) {}
+    ) {
+    }
 }

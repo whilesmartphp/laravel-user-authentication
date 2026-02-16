@@ -8,7 +8,9 @@ use Illuminate\Queue\SerializesModels;
 
 class VerificationCodeGeneratedEvent
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable;
+    use InteractsWithSockets;
+    use SerializesModels;
 
     /**
      * Create a new event instance.
@@ -18,5 +20,6 @@ class VerificationCodeGeneratedEvent
         public string $code,
         public string $purpose,
         public string $type = 'email' // 'email' or 'phone'
-    ) {}
+    ) {
+    }
 }

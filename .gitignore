@@ -3,3 +3,5 @@ vendor/
 .idea/
 .phpunit.result.cache
 workbench/storage
+docs/api.json
+reports/

@@ -10,7 +10,9 @@ use Laravel\Socialite\Contracts\User as SocialiteUser;
 
 class OauthUserAuthenticatedEvent
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable;
+    use InteractsWithSockets;
+    use SerializesModels;
 
     public Authenticatable $user;
 
@@ -20,8 +22,12 @@ class OauthUserAuthenticatedEvent
 
     public bool $isNewUser;
 
-    public function __construct(Authenticatable $user, ?SocialiteUser $socialUser, string $driver, bool $isNewUser = false)
-    {
+    public function __construct(
+        Authenticatable $user,
+        ?SocialiteUser $socialUser,
+        string $driver,
+        bool $isNewUser = false
+    ) {
         $this->user = $user;
         $this->socialUser = $socialUser;
         $this->driver = $driver;
