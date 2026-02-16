@@ -95,7 +95,7 @@ class OauthTest extends \Orchestra\Testbench\TestCase
 
         $response = $this->getJson('/api/oauth/github/callback?code=test_code');
 
-        $response->assertStatus(200)
+        $response->assertStatus(201)
             ->assertJsonStructure([
                 'success',
                 'data' => [
@@ -149,7 +149,7 @@ class OauthTest extends \Orchestra\Testbench\TestCase
 
         $response = $this->getJson('/api/oauth/github/callback?code=test_code');
 
-        $response->assertStatus(200);
+        $response->assertStatus(201);
 
         $oauthAccount = OauthAccount::where('user_id', $user->id)->where('provider', 'github')->first();
         $this->assertEquals('https://new-avatar.example.com', $oauthAccount->avatar_url);
