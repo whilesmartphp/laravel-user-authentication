@@ -10,6 +10,9 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: [ '8.3', '8.4', '8.5' ]
     services:
       mysql-service:
         image: mysql:5.7
@@ -43,9 +46,10 @@ jobs:
           echo "DB_USERNAME=root" >> workbench/.env
           echo "DB_PASSWORD=password" >> workbench/.env
           echo "APP_ENV=testing" >> workbench/.env
-      - uses: shivammathur/setup-php@v2
+      - name: Testing on PHP ${{ matrix.php-version }}
+        uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: ${{ matrix.php-version }}
           tools: composer
           extensions: pcov
           coverage: pcov
