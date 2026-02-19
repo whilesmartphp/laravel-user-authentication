@@ -41,7 +41,8 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "Workbench\\App\\": "workbench/app/"
+      "Workbench\\App\\": "workbench/app/",
+      "Whilesmart\\UserAuthentication\\Tests\\": "tests/"
     }
   },
   "scripts": {
