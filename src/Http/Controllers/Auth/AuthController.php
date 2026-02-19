@@ -22,6 +22,7 @@ use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Models\OauthAccount;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
+use Whilesmart\UserAuthentication\Rules\EmailDomainRestriction;
 use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
@@ -37,7 +38,14 @@ class AuthController extends Controller
 
         try {
             $validationRules = [
-                'email' => 'required|string|email|max:255|unique:users',
+                'email' => [
+                    'required',
+                    'string',
+                    'email',
+                    'max:255',
+                    'unique:users',
+                    new EmailDomainRestriction,
+                ],
                 'first_name' => 'required|string|max:255',
                 'last_name' => 'string|max:255',
                 'username' => 'string|max:255|unique:users',

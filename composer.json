@@ -36,7 +36,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Workbench\\App\\": "workbench/app/"
+            "Workbench\\App\\": "workbench/app/",
+            "Whilesmart\\UserAuthentication\\Tests\\": "tests/"
         }
     },
     "scripts": {
@@ -60,6 +61,10 @@
         ],
         "lint": [
             "@php vendor/bin/pint --ansi"
+        ],
+        "test": [
+            "./vendor/bin/pint",
+            "./vendor/bin/testbench package:test"
         ]
     }
 }
