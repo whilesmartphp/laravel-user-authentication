@@ -20,6 +20,5 @@ class VerificationCodeGeneratedEvent
         public string $code,
         public string $purpose,
         public string $type = 'email' // 'email' or 'phone'
-    ) {
-    }
+    ) {}
 }

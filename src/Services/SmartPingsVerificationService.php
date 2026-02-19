@@ -29,7 +29,7 @@ class SmartPingsVerificationService
                     'SmartPings is enabled but client_id or secret_id is missing. Cannot proceed with verification.'
                 );
                 throw new InvalidArgumentException(
-                    'SmartPings verification is enabled but credentials are missing.' .
+                    'SmartPings verification is enabled but credentials are missing.'.
                     ' Please configure SMARTPINGS_CLIENT_ID and SMARTPINGS_SECRET_ID environment variables.'
                 );
             }
@@ -72,7 +72,7 @@ class SmartPingsVerificationService
             if (isset($responseData['success']) && $responseData['success'] === true) {
                 return [
                     'success' => true,
-                    'message' => $responseData['message'] ?? ucfirst($type) . ' verification sent successfully',
+                    'message' => $responseData['message'] ?? ucfirst($type).' verification sent successfully',
                 ];
             }
 
