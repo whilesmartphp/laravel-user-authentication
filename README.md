@@ -188,6 +188,14 @@ php artisan vendor:publish --provider="Whilesmart\UserAuthentication\UserAuthent
 * **📖 [Email/Phone Verification](docs/verification.md)** - Set up verification with any provider
 * **📖 [Customization Guide](docs/customization.md)** - Response formatting, middleware hooks
 
+## Development Commands
+- `composer test` - Run unit tests
+- `composer phpmd` - Run Mess Detector checks
+- `composer phpstan` - Run Static Analysis checks
+- `composer phpcs` - Run PHP code style checks
+- `composer pint` - Run Laravel code style checks
+- `composer openapi` - Run open api documentation generation
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

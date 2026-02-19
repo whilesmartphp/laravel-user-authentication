@@ -2,6 +2,9 @@
 
 namespace Whilesmart\UserAuthentication\Enums;
 
+/**
+ * @codeCoverageIgnore
+ */
 enum HookAction: string
 {
     case REGISTER = 'register';

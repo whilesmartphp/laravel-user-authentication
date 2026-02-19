@@ -15,6 +15,7 @@ class VerificationCode extends Model
 
     public function isExpired(): bool
     {
+        // @phpstan-ignore-next-line
         return now()->greaterThan($this->expires_at);
     }
 

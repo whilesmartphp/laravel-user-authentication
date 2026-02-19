@@ -44,10 +44,7 @@ trait HasMiddlewareHooks
                 $hook = app($hookClass);
                 if ($hook instanceof MiddlewareHookInterface) {
                     $actionValue = $action instanceof HookAction ? $action->value : $action;
-                    $result = $hook->after($request, $response, $actionValue);
-                    if ($result instanceof JsonResponse) {
-                        $response = $result;
-                    }
+                    $response = $hook->after($request, $response, $actionValue);
                 }
             }
         }
