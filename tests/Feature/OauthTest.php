@@ -1,5 +1,7 @@
 <?php
 
+namespace Whilesmart\UserAuthentication\Tests\Feature;
+
 use Faker\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
