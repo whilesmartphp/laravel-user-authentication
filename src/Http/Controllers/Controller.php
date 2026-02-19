@@ -15,8 +15,6 @@ use OpenApi\Attributes as OA;
 #[OA\Info(version: '1.0.0', title: 'User Authentication API')]
 #[OA\Server(url: 'http://localhost:8000/api', description: 'Local server')]
 /**
-* Created solely for the purpose of ensuring open api docs can be generated
+ * Created solely for the purpose of ensuring open api docs can be generated
  */
-class Controller
-{
-}
+class Controller {}
