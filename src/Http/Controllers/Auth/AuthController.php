@@ -48,7 +48,7 @@ class AuthController extends Controller
                     'email',
                     'max:255',
                     'unique:users',
-                    new EmailDomainRestriction,
+                    new EmailDomainRestriction(),
                 ],
                 'first_name' => 'required|string|max:255',
                 'last_name' => 'string|max:255',
@@ -176,7 +176,7 @@ class AuthController extends Controller
 
             return $this->runAfterHooks($request, $response, HookAction::LOGIN);
         } catch (\Exception $e) {
-            $this->error('An error occurred during login: '.$e->getMessage(), ['exception' => $e]);
+            $this->error('An error occurred during login: ' . $e->getMessage(), ['exception' => $e]);
 
             $response = $this->failure('An error occurred during login', 500);
 
@@ -239,7 +239,7 @@ class AuthController extends Controller
                 HookAction::OAUTH_CALLBACK
             );
         } catch (\GuzzleHttp\Exception\ClientException $e) {
-            $this->error("OAuth provider communication error for {$driver}: ".$e->getMessage());
+            $this->error("OAuth provider communication error for {$driver}: " . $e->getMessage());
             $statusCode = in_array($e->getResponse()->getStatusCode(), [401, 403]) ? 401 : 400;
 
             return $this->runAfterHooks(
@@ -248,7 +248,7 @@ class AuthController extends Controller
                 HookAction::OAUTH_CALLBACK
             );
         } catch (\Exception $e) {
-            $this->error("OAuth callback failed for {$driver}: ".$e->getMessage());
+            $this->error("OAuth callback failed for {$driver}: " . $e->getMessage());
 
             return $this->runAfterHooks(
                 $request,
@@ -303,8 +303,8 @@ class AuthController extends Controller
 
         // Enhanced rate limiting with IP + contact
         $contact = $request->contact;
-        $rateLimitKeyIp = 'verification-code:ip:'.$request->ip();
-        $rateLimitKeyContact = 'verification-code:contact:'.hash('sha256', $contact);
+        $rateLimitKeyIp = 'verification-code:ip:' . $request->ip();
+        $rateLimitKeyContact = 'verification-code:contact:' . hash('sha256', $contact);
         $attempts = config('user-authentication.verification.rate_limit_attempts');
         $minutes = config('user-authentication.verification.rate_limit_minutes', 5);
 
@@ -443,8 +443,8 @@ class AuthController extends Controller
         string $type,
         HookAction $hookAction
     ): ?JsonResponse {
-        $purpose = 'registration_'.$type;
-        $errorMessage = ucfirst($type).' verification required. Please verify your '.$type.' first.';
+        $purpose = 'registration_' . $type;
+        $errorMessage = ucfirst($type) . ' verification required. Please verify your ' . $type . ' first.';
 
         if ($smartPingsService->isEnabled()) {
             if (! $smartPingsService->isVerified($contact, $type)) {
@@ -527,7 +527,7 @@ class AuthController extends Controller
             $response = $this->failure('Invalid token', 400);
 
             return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
-        } catch (AuthException|FirebaseException $e) {
+        } catch (AuthException | FirebaseException $e) {
             $this->error($e->getMessage());
             $response = $this->failure('Invalid token', 400);
 

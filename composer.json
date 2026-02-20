@@ -76,8 +76,8 @@
             "vendor/bin/phpmd src text phpmd.xml"
         ],
         "phpstan": "phpstan analyse src --memory-limit=2048M --level=5",
-        "phpcs": "phpcbf src",
-        "phpcs:test": "phpcs src",
+        "phpcs": "./vendor/bin/phpcbf src",
+        "phpcs:test": "./vendor/bin/phpcs src",
       "test": [
                   "./vendor/bin/pint",
                   "./vendor/bin/testbench package:test"
