@@ -5,6 +5,8 @@ namespace Whilesmart\UserAuthentication\Tests;
 use Faker\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\SocialiteServiceProvider;
 use Orchestra\Testbench\Attributes\WithMigration;
 use Whilesmart\UserAuthentication\Models\User;
 
@@ -45,6 +47,17 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
     {
         return [
             \Whilesmart\UserAuthentication\UserAuthenticationServiceProvider::class,
+            SocialiteServiceProvider::class,
+        ];
+    }
+
+    /**
+     * Get package aliases.
+     */
+    protected function getPackageAliases($app)
+    {
+        return [
+            'Socialite' => Socialite::class,
         ];
     }
 }
