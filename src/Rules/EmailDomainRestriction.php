@@ -22,11 +22,11 @@ class EmailDomainRestriction implements ValidationRule
 
         if ($mode === 'blacklist') {
             if (in_array($emailDomain, $restrictedDomains)) {
-                $fail("This {$attribute} email domain is not allowed for registration.");
+                $fail("This {$attribute} domain is not allowed for registration.");
             }
         } elseif ($mode === 'whitelist') {
             if (! in_array($emailDomain, $restrictedDomains)) {
-                $fail("This {$attribute} email domain is not allowed for registration.");
+                $fail("This {$attribute} domain is not allowed for registration.");
             }
         }
     }
