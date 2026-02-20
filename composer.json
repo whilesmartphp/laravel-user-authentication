@@ -80,6 +80,8 @@
         "phpcs:test": "./vendor/bin/phpcs src",
         "test": [
             "./vendor/bin/pint",
+            "@lint",
+            "@phpmd",
             "@phpcs",
             "./vendor/bin/testbench package:test"
             ],

@@ -390,14 +390,14 @@ class AuthenticationTest extends TestCase
     public function test_smartpings_service_is_disabled_when_not_configured()
     {
         config(['user-authentication.verification.provider' => 'default']);
-        $service = new SmartPingsVerificationService;
+        $service = new SmartPingsVerificationService();
         $this->assertFalse($service->isEnabled());
     }
 
     public function test_smartpings_send_verification_returns_error_when_disabled()
     {
         config(['user-authentication.verification.provider' => 'default']);
-        $service = new SmartPingsVerificationService;
+        $service = new SmartPingsVerificationService();
         $result = $service->sendVerification('test@example.com', 'email');
         $this->assertFalse($result['success']);
     }
