@@ -69,11 +69,11 @@ class PasswordResetController extends Controller
         $request = $this->runBeforeHooks($request, HookAction::PASSWORD_RESET_REQUEST);
 
         // Rate limiting
-        if (RateLimiter::tooManyAttempts('password-reset:'.$request->ip(), 5)) {
+        if (RateLimiter::tooManyAttempts('password-reset:' . $request->ip(), 5)) {
             return $this->failure('Too many attempts, please try again later.', 429);
         }
 
-        RateLimiter::hit('password-reset:'.$request->ip(), 300);
+        RateLimiter::hit('password-reset:' . $request->ip(), 300);
 
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',

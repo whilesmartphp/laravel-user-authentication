@@ -51,7 +51,9 @@ class UserAuthOpenApiDocs
     /**
      * @suppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function firebaseAuthCallback(Request $request, string $driver) {}
+    public function firebaseAuthCallback(Request $request, string $driver)
+    {
+    }
 
     #[OA\Post(
         path: '/register',
@@ -77,7 +79,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 422, description: 'Validation error'),
         ]
     )]
-    public function register() {}
+    public function register()
+    {
+    }
 
     #[OA\Post(
         path: '/login',
@@ -102,7 +106,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 500, description: 'Server error'),
         ]
     )]
-    public function login() {}
+    public function login()
+    {
+    }
 
     #[OA\Post(
         path: '/logout',
@@ -117,7 +123,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 500, description: 'Server error'),
         ]
     )]
-    public function logout() {}
+    public function logout()
+    {
+    }
 
     #[OA\Get(
         path: '/oauth/{driver}/login',
@@ -137,7 +145,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 500, description: 'Server error'),
         ]
     )]
-    public function oauthLogin() {}
+    public function oauthLogin()
+    {
+    }
 
     #[OA\Get(
         path: '/oauth/{driver}/callback',
@@ -157,7 +167,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 500, description: 'Server error'),
         ]
     )]
-    public function oauthCallback() {}
+    public function oauthCallback()
+    {
+    }
 
     #[OA\Post(
         path: '/send-verification-code',
@@ -192,7 +204,9 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 429, description: 'Too many requests'),
         ]
     )]
-    public function sendVerificationCode() {}
+    public function sendVerificationCode()
+    {
+    }
 
     #[OA\Post(
         path: '/verify-code',
@@ -228,5 +242,7 @@ class UserAuthOpenApiDocs
             new OA\Response(response: 422, description: 'Validation error'),
         ]
     )]
-    public function verifyCode() {}
+    public function verifyCode()
+    {
+    }
 }
