@@ -78,10 +78,12 @@
         "phpstan": "phpstan analyse src --memory-limit=2048M --level=5",
         "phpcs": "./vendor/bin/phpcbf src",
         "phpcs:test": "./vendor/bin/phpcs src",
-      "test": [
-                  "./vendor/bin/pint",
-                  "./vendor/bin/testbench package:test"
-              ],
-              "openapi": "vendor/bin/openapi src --debug --output docs/api.json"
-          }
+        "test": [
+            "./vendor/bin/pint",
+            "@phpcs",
+            "./vendor/bin/testbench package:test"
+            ],
+        "openapi": "vendor/bin/openapi src --debug --output docs/api.json"
+          
+    }
 }
