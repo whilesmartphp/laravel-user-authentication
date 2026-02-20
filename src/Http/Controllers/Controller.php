@@ -17,4 +17,6 @@ use OpenApi\Attributes as OA;
 /**
  * Created solely for the purpose of ensuring open api docs can be generated
  */
-class Controller {}
+class Controller
+{
+}
