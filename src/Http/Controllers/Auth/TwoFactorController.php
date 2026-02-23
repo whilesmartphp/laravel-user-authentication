@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Auth;
 use Whilesmart\UserAuthentication\Services\TwoFactorService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 
+/**
+ * @uses \Whilesmart\UserAuthentication\Models\User
+ */
+
 class TwoFactorController extends Controller
 {
     use ApiResponse;
@@ -17,6 +21,7 @@ class TwoFactorController extends Controller
      */
     public function setup(Request $request)
     {
+        /** @var \Whilesmart\UserAuthentication\Models\User $user */
         $user = $request->user();
 
         // generate fresh secret
@@ -52,6 +57,8 @@ class TwoFactorController extends Controller
     public function confirm(Request $request)
     {
         $request->validate(['code' => 'required|string']);
+
+        /** @var \Whilesmart\UserAuthentication\Models\User $user */
         $user = $request->user();
 
         // check if they actually started setup
@@ -88,6 +95,8 @@ class TwoFactorController extends Controller
     public function disable(Request $request)
     {
         $request->validate(['code' => 'required|string']);
+
+        /** @var \Whilesmart\UserAuthentication\Models\User $user */
         $user = $request->user();
 
         if (! $user->hasTwoFactorEnabled()) {
@@ -117,6 +126,7 @@ class TwoFactorController extends Controller
             return response()->json(['message' => 'Session expired.'], 401);
         }
 
+        /** @var \Whilesmart\UserAuthentication\Models\User $user */
         $user = \Whilesmart\UserAuthentication\Models\User::find($userId);
 
         // CASE 1: TOTP including recovery codes

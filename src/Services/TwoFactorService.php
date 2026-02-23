@@ -62,7 +62,7 @@ class TwoFactorService
     {
         // 1. Generate the numeric code
         $codeLength = config('user-authentication.verification.code_length', 6);
-        $code = str_pad(random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
+        $code = str_pad((string)random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
 
         $expiry = config('user-authentication.verification.code_expiry_minutes', 5);
 

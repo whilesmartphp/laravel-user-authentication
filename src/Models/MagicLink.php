@@ -4,6 +4,19 @@ namespace Whilesmart\UserAuthentication\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property string $token
+ * @property \Illuminate\Support\Carbon $expires_at
+ * @property bool $is_used
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Whilesmart\UserAuthentication\Models\User $user
+ * @method static \Illuminate\Database\Eloquent\Builder|MagicLink whereToken($value)
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
+
 class MagicLink extends Model
 {
     protected $fillable = [

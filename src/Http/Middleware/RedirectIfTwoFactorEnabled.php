@@ -14,7 +14,8 @@ class RedirectIfTwoFactorEnabled
      */
     public function handle(Request $request, Closure $next)
     {
-        $user = Auth::user();
+        /** @var \Whilesmart\UserAuthentication\Models\User|null $user */
+        $user = $request->user();
 
         if ($user && $user->twoFactorAuth->type && ! $request->session()->has('2fa:verified')) {
             $userId = $user->id;

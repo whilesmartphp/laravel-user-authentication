@@ -123,12 +123,7 @@ class AuthController extends Controller
                 'message' => $e->getMessage(), // Change this to see the actual error
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-            ], 500);
-
-            // Uncomment below lines to return a generic error message instead of the actual exception details
-            $response = $this->failure('An error occurred', 500);
-
-            return $this->runAfterHooks($request, $response, HookAction::REGISTER);
+            ], 500);           
         }
     }
 

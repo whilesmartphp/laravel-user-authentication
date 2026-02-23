@@ -10,6 +10,20 @@ use Laravel\Sanctum\HasApiTokens;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasTwoFactorAuth;
 
+/**
+ * @property int $id
+ * @property string $email
+ * @property string $password
+ * @property string|null $first_name
+ * @property string|null $last_name
+ * @property string|null $phone
+ * @property string|null $two_factor_type
+ * @property-read \Whilesmart\UserAuthentication\Models\TwoFactorAuth|null $twoFactorAuth
+ * @property-read \Illuminate\Database\Eloquent\Collection|\Whilesmart\UserAuthentication\Models\OauthAccount[] $oauthAccounts
+ * @method bool hasTwoFactorEnabled()
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
+
 class User extends Authenticatable
 {
     use ApiResponse;
