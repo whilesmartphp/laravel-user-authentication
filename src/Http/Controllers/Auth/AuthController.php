@@ -14,7 +14,9 @@ use Kreait\Firebase\Exception\AuthException;
 use Kreait\Firebase\Exception\FirebaseException;
 use Kreait\Laravel\Firebase\Facades\Firebase;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 use Whilesmart\UserAuthentication\Enums\HookAction;
+use Whilesmart\UserAuthentication\Events\OauthUserAuthenticatedEvent;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Events\UserLoggedOutEvent;
 use Whilesmart\UserAuthentication\Events\UserRegisteredEvent;
@@ -30,7 +32,9 @@ use Whilesmart\UserAuthentication\Traits\Loggable;
 
 class AuthController extends Controller
 {
-    use ApiResponse, HasMiddlewareHooks, Loggable;
+    use ApiResponse;
+    use HasMiddlewareHooks;
+    use Loggable;
 
     public function register(Request $request): JsonResponse
     {
@@ -61,13 +65,31 @@ class AuthController extends Controller
             $smartPingsService = app(SmartPingsVerificationService::class);
 
             if ($requireEmailVerification) {
-                if ($response = $this->checkVerificationStatus($request, $smartPingsService, $request->email, 'email', HookAction::REGISTER)) {
+                $response = $this->checkVerificationStatus(
+                    $request,
+                    $smartPingsService,
+                    $request->email,
+                    'email',
+                    HookAction::REGISTER
+                );
+                if (
+                    $response
+                ) {
                     return $response;
                 }
             }
 
             if ($requirePhoneVerification && $request->has('phone')) {
-                if ($response = $this->checkVerificationStatus($request, $smartPingsService, $request->phone, 'phone', HookAction::REGISTER)) {
+                $response = $this->checkVerificationStatus(
+                    $request,
+                    $smartPingsService,
+                    $request->phone,
+                    'phone',
+                    HookAction::REGISTER
+                );
+                if (
+                    $response
+                ) {
                     return $response;
                 }
             }
@@ -177,7 +199,7 @@ class AuthController extends Controller
 
             return $this->runAfterHooks($request, $response, HookAction::LOGIN);
         } catch (\Exception $e) {
-            // $this->error('An error occurred during login: '.$e->getMessage(), ['exception' => $e]);
+            // $this->error('An error occurred during login: ' . $e->getMessage(), ['exception' => $e]);
 
             // $response = $this->failure('An error occurred during login', 500);
 
@@ -195,6 +217,9 @@ class AuthController extends Controller
     {
         $request = $this->runBeforeHooks($request, HookAction::LOGOUT);
 
+        /**
+         * @var User $user
+        */
         $user = $request->user();
         $user->currentAccessToken()->delete();
         UserLoggedOutEvent::dispatch($user);
@@ -208,7 +233,15 @@ class AuthController extends Controller
     {
         $request = $this->runBeforeHooks($request, HookAction::OAUTH_LOGIN);
 
-        $url = Socialite::driver($driver)->stateless()->redirect()->getTargetUrl();
+        // @phpstan-ignore-next-line
+        $socialite = Socialite::driver($driver)->stateless();
+
+        $scopes = config("user-authentication.oauth_scopes.{$driver}", []);
+        if (! empty($scopes)) {
+            $socialite->scopes($scopes);
+        }
+
+        $url = $socialite->redirect()->getTargetUrl();
 
         $response = $this->success([
             'url' => $url,
@@ -222,7 +255,36 @@ class AuthController extends Controller
     {
         $request = $this->runBeforeHooks($request, HookAction::OAUTH_CALLBACK);
 
-        $social_user = Socialite::driver($driver)->stateless()->user();
+        try {
+            // @phpstan-ignore-next-line
+            $social_user = Socialite::driver($driver)->stateless()->user();
+        } catch (InvalidStateException $e) {
+            $this->error("OAuth state mismatch for {$driver}");
+            $this->error($e->getMessage());
+            return $this->runAfterHooks(
+                $request,
+                $this->failure('Invalid state. Please try again.', 400),
+                HookAction::OAUTH_CALLBACK
+            );
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            $this->error("OAuth provider communication error for {$driver}: " . $e->getMessage());
+            $statusCode = in_array($e->getResponse()->getStatusCode(), [401, 403]) ? 401 : 400;
+
+            return $this->runAfterHooks(
+                $request,
+                $this->failure('OAuth authentication failed', $statusCode),
+                HookAction::OAUTH_CALLBACK
+            );
+        } catch (\Exception $e) {
+            $this->error("OAuth callback failed for {$driver}: " . $e->getMessage());
+
+            return $this->runAfterHooks(
+                $request,
+                $this->failure('OAuth authentication failed', 400),
+                HookAction::OAUTH_CALLBACK
+            );
+        }
+
         $email = $social_user->getEmail();
         $name = $social_user->getName();
 
@@ -232,17 +294,24 @@ class AuthController extends Controller
             return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
         }
 
-        $existing_user = $this->handleUserAuthentication($email, $name, $driver);
+        $oauthData = [
+            'provider_id' => $social_user->getId(),
+            'avatar_url' => $social_user->getAvatar(),
+            'token' => $social_user->token,
+        ];
+
+        [$existing_user, $isNewUser] = $this->handleUserAuthentication($email, $name, $driver, $oauthData);
+
+        OauthUserAuthenticatedEvent::dispatch($existing_user, $social_user, $driver, $isNewUser);
 
         $response = [
             'user' => $existing_user,
             'token' => $existing_user->createToken('auth-token')->plainTextToken,
         ];
 
-        $response = $this->success($response, 'User authenticated successfully', 200);
+        $response = $this->success($response, 'User authenticated successfully', 201);
 
         return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
-
     }
 
     public function sendVerificationCode(Request $request): JsonResponse
@@ -262,13 +331,15 @@ class AuthController extends Controller
 
         // Enhanced rate limiting with IP + contact
         $contact = $request->contact;
-        $rateLimitKeyIp = 'verification-code:ip:'.$request->ip();
-        $rateLimitKeyContact = 'verification-code:contact:'.hash('sha256', $contact);
+        $rateLimitKeyIp = 'verification-code:ip:' . $request->ip();
+        $rateLimitKeyContact = 'verification-code:contact:' . hash('sha256', $contact);
         $attempts = config('user-authentication.verification.rate_limit_attempts');
         $minutes = config('user-authentication.verification.rate_limit_minutes', 5);
 
-        if (RateLimiter::tooManyAttempts($rateLimitKeyIp, $attempts) ||
-            RateLimiter::tooManyAttempts($rateLimitKeyContact, $attempts)) {
+        if (
+            RateLimiter::tooManyAttempts($rateLimitKeyIp, $attempts) ||
+            RateLimiter::tooManyAttempts($rateLimitKeyContact, $attempts)
+        ) {
             $response = $this->failure('Too many attempts, please try again later.', 429);
 
             return $this->runAfterHooks($request, $response, HookAction::SEND_VERIFICATION_CODE);
@@ -310,7 +381,12 @@ class AuthController extends Controller
         } else {
             // Use default verification system
             $codeLength = config('user-authentication.verification.code_length', 6);
-            $verificationCode = str_pad(random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
+            $verificationCode = str_pad(
+                (string)random_int(0, pow(10, $codeLength) - 1),
+                $codeLength,
+                '0',
+                STR_PAD_LEFT
+            );
             $expiryMinutes = config('user-authentication.verification.code_expiry_minutes');
             $expiresAt = now()->addMinutes($expiryMinutes);
 
@@ -374,7 +450,8 @@ class AuthController extends Controller
                 return $this->failure('Invalid or expired code.', 400);
             }
 
-            if (! Hash::check($code, $codeEntry->code) || $codeEntry->isExpired()) {
+            // @phpstan-ignore-next-line
+            if (! Hash::check($code, (string) $codeEntry->code) || $codeEntry->isExpired()) {
                 return $this->failure('Invalid or expired code.', 400);
             }
 
@@ -394,12 +471,14 @@ class AuthController extends Controller
         string $type,
         HookAction $hookAction
     ): ?JsonResponse {
-        $purpose = 'registration_'.$type;
-        $errorMessage = ucfirst($type).' verification required. Please verify your '.$type.' first.';
+
+        $purpose = 'registration_' . $type;
+        $errorMessage = ucfirst($type) . ' verification required. Please verify your ' . $type . ' first.';
 
         $useSelfManaged = config('user-authentication.verification.self_managed', true);
 
         if (! $useSelfManaged && $smartPingsService->isEnabled()) {
+
             if (! $smartPingsService->isVerified($contact, $type)) {
                 $response = $this->failure($errorMessage, 422);
 
@@ -458,7 +537,14 @@ class AuthController extends Controller
                 }
             }
 
-            $existing_user = $this->handleUserAuthentication($email, $name, $driver);
+            $oauthData = [
+                'provider_id' => $uid,
+                'avatar_url' => $user->photoUrl,
+            ];
+
+            [$existing_user, $isNewUser] = $this->handleUserAuthentication($email, $name, $driver, $oauthData);
+
+            OauthUserAuthenticatedEvent::dispatch($existing_user, null, $driver, $isNewUser);
 
             $response = [
                 'user' => $existing_user,
@@ -473,7 +559,7 @@ class AuthController extends Controller
             $response = $this->failure('Invalid token', 400);
 
             return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
-        } catch (AuthException|FirebaseException $e) {
+        } catch (AuthException | FirebaseException $e) {
             $this->error($e->getMessage());
             $response = $this->failure('Invalid token', 400);
 
@@ -483,33 +569,47 @@ class AuthController extends Controller
 
     /**
      * Private helper method to handle user authentication (login/create) and OAuth account creation.
-     *
-     * @return mixed The authenticated user instance.
+     * @return array{0: mixed, 1: bool} The authenticated user instance and whether it's a new user.
      */
-    private function handleUserAuthentication(string $email, string $name, string $driver)
+    private function handleUserAuthentication(string $email, string $name, string $driver, array $oauthData = []): array
     {
         $User = config('user-authentication.user_model', User::class);
         $existing_user = $User::where('email', $email)->first();
+        $isNewUser = false;
+
         if ($existing_user) {
             UserLoggedInEvent::dispatch($existing_user);
-            $this->info("User with email $email  just logged in via social auth ");
+            $this->info("User with email $email just logged in via social auth");
         } else {
+            // Split name to individual names
+            $split_names = explode(' ', $name);
+            $first_name = $split_names[0];
+            $last_names = '';
+            if (count($split_names) > 1) {
+                array_shift($split_names);
+                $last_names = implode(' ', $split_names);
+            }
+
             $user_data = [
-                'first_name' => $name,
+                'first_name' => $first_name,
+                'last_name' => $last_names,
                 'email' => $email,
                 'password' => Hash::make(Str::random(10)),
                 'email_verified_at' => now(),
             ];
             $existing_user = $User::create($user_data);
+            $isNewUser = true;
             UserRegisteredEvent::dispatch($existing_user);
             $this->info("New user with email $email just registered via social auth");
         }
-        OauthAccount::firstOrCreate([
-            'user_id' => $existing_user->id,
-            'provider' => $driver,
-        ]);
 
-        return $existing_user;
+        OauthAccount::updateOrCreate(
+            ['user_id' => $existing_user->id, 'provider' => $driver],
+            $oauthData,
+        );
+
+        return [$existing_user, $isNewUser];
+
     }
 
     /**
@@ -537,7 +637,7 @@ class AuthController extends Controller
     //     $subRequest->replace([
     //         'contact' => $contact,
     //         'type' => $type,
-    //         'purpose' => 'login', // This matches the "login_{$type}" format in your code
+    //         'purpose' => 'login', // This matches the "login_{$type}" format
     //     ]);
 
     //     // Internal call to the existing method in this same class

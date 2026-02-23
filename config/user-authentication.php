@@ -9,6 +9,13 @@ return [
 
     'response_formatter' => \Whilesmart\UserAuthentication\ResponseFormatters\DefaultResponseFormatter::class,
 
+    'oauth_scopes' => [
+        // 'github' => ['read:user', 'user:email'],
+        // 'google' => ['openid', 'profile', 'email'],
+    ],
+
+    'encrypt_oauth_tokens' => env('USER_AUTH_ENCRYPT_OAUTH_TOKENS', false),
+
     'middleware_hooks' => [
         // Add your middleware hook classes here
         // Example: \App\Http\Middleware\CustomAuthHook::class,

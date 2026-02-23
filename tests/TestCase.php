@@ -5,6 +5,8 @@ namespace Whilesmart\UserAuthentication\Tests;
 use Faker\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\SocialiteServiceProvider;
 use Orchestra\Testbench\Attributes\WithMigration;
 use PragmaRX\Google2FALaravel\ServiceProvider as Google2FAServiceProvider;
 use Whilesmart\UserAuthentication\Models\User;
@@ -34,6 +36,11 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
         ], $attributes));
     }
 
+    /**
+     * Define database migrations.
+     *
+     * @return void
+     */
     protected function defineDatabaseMigrations()
     {
         $this->loadMigrationsFrom(
@@ -46,6 +53,15 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
         return [
             \Laravel\Sanctum\SanctumServiceProvider::class,
             'Whilesmart\UserAuthentication\UserAuthenticationServiceProvider',
+            SocialiteServiceProvider::class,
+
+        ];
+    }
+
+    protected function getPackageAliases($app)
+    {
+        return [
+            'Socialite' => Socialite::class,
             Google2FAServiceProvider::class,
         ];
     }
