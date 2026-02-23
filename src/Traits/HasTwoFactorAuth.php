@@ -4,6 +4,7 @@ namespace Whilesmart\UserAuthentication\Traits;
 
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Whilesmart\UserAuthentication\Models\TwoFactorAuth;
+use Whilesmart\UserAuthentication\Models\OauthAccount;
 
 /**
  * @property int $id
@@ -14,7 +15,7 @@ use Whilesmart\UserAuthentication\Models\TwoFactorAuth;
  * @property string|null $phone
  * @property string|null $two_factor_type
  * @property-read \Whilesmart\UserAuthentication\Models\TwoFactorAuth|null $twoFactorAuth
- * @property-read \Illuminate\Database\Eloquent\Collection|\Whilesmart\UserAuthentication\Models\OauthAccount[] $oauthAccounts
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, OauthAccount> $oauthAccounts
  * @method bool hasTwoFactorEnabled()
  * @mixin \Illuminate\Database\Eloquent\Builder
  */

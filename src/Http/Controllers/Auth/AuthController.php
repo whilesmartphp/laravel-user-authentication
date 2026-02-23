@@ -123,7 +123,7 @@ class AuthController extends Controller
                 'message' => $e->getMessage(), // Change this to see the actual error
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-            ], 500);           
+            ], 500);
         }
     }
 
