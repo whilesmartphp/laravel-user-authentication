@@ -117,7 +117,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             $this->error($e);
 
-            // return exact error message in response for easier debugging during development, can be changed to a generic message in production
+            // return exact error message in response for easier debugging during development,
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(), // Change this to see the actual error
@@ -478,7 +478,6 @@ class AuthController extends Controller
         $useSelfManaged = config('user-authentication.verification.self_managed', true);
 
         if (! $useSelfManaged && $smartPingsService->isEnabled()) {
-
             if (! $smartPingsService->isVerified($contact, $type)) {
                 $response = $this->failure($errorMessage, 422);
 
@@ -609,7 +608,6 @@ class AuthController extends Controller
         );
 
         return [$existing_user, $isNewUser];
-
     }
 
     /**

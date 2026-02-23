@@ -12,7 +12,11 @@ use Whilesmart\UserAuthentication\Traits\HasTwoFactorAuth;
 
 class User extends Authenticatable
 {
-    use ApiResponse, HasApiTokens, HasFactory, HasTwoFactorAuth, Notifiable;
+    use ApiResponse;
+    use HasApiTokens;
+    use HasFactory;
+    use HasTwoFactorAuth;
+    use Notifiable;
 
     /**
      * The attributes that are mass assignable.

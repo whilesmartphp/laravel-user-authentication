@@ -70,12 +70,12 @@ class UserAuthenticationServiceProvider extends ServiceProvider
             }
         }
 
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
         // This is vital for Bruno/Web testing:
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__.'/../database/migrations' => database_path('migrations'),
+                __DIR__ . '/../database/migrations' => database_path('migrations'),
             ], 'migrations');
         }
 

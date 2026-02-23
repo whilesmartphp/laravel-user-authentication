@@ -54,6 +54,8 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
             \Laravel\Sanctum\SanctumServiceProvider::class,
             'Whilesmart\UserAuthentication\UserAuthenticationServiceProvider',
             SocialiteServiceProvider::class,
+            \PragmaRX\Google2FALaravel\ServiceProvider::class,
+
 
         ];
     }

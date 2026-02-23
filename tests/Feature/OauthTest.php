@@ -1,5 +1,7 @@
 <?php
 
+namespace Whilesmart\UserAuthentication\Tests\Feature;
+
 use Faker\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -12,11 +14,12 @@ use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Events\UserRegisteredEvent;
 use Whilesmart\UserAuthentication\Models\OauthAccount;
 use Whilesmart\UserAuthentication\Models\User;
+use Whilesmart\UserAuthentication\Tests\TestCase;
 
 use function Orchestra\Testbench\workbench_path;
 
 #[WithMigration]
-class OauthTest extends \Orchestra\Testbench\TestCase
+class OauthTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -82,6 +85,7 @@ class OauthTest extends \Orchestra\Testbench\TestCase
 
     public function test_oauth_callback_creates_new_user_and_oauth_account()
     {
+        $this->withoutExceptionHandling();
         Event::fake();
 
         $socialiteUser = $this->mockSocialiteUser([
