@@ -47,4 +47,32 @@ class TwoFactorMiddlewareTest extends TestCase
         // Ensure the user remains unauthenticated/not logged in
         $this->assertFalse(Auth::check());
     }
+
+    /** @test */
+    public function test_middleware_blocks_access_to_temporary_protected_route()
+    {
+        $this->app['router']->get('/api/test-protected', function () {
+            return response()->json(['success' => true]);
+        })->middleware(['web', \Whilesmart\UserAuthentication\Http\Middleware\RedirectIfTwoFactorEnabled::class]);
+
+        $user = User::create([
+            'first_name' => 'Middleware',
+            'last_name' => 'Test',
+            'email' => 'middleware@example.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        $user->twoFactorAuth()->create([
+            'secret' => 'KVKFKRJTMR2G6KBV',
+            'type' => 'totp',
+            'is_enabled' => true,
+        ]);
+
+        session(['2fa:user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->getJson('/api/test-protected');
+
+        $response->assertStatus(403);
+        $response->assertJsonFragment(['two_factor_required' => true]);
+    }
 }
