@@ -75,9 +75,7 @@ class TwoFactorAuthenticationTest extends TestCase
         $this->assertAuthenticatedAs($user);
 
         // Assert code was consumed (removed from DB)
-        // $this->assertNotContains('ABCDE12345', $user->fresh()->twoFactorAuth->recovery_codes);
         $updatedCodes = $user->fresh()->twoFactorAuth->getRawOriginal('recovery_codes');
-        // dd($updatedCodes);
         $this->assertStringNotContainsString('ABCDE12345', $updatedCodes);
     }
 
