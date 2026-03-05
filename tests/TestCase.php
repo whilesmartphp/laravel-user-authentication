@@ -20,6 +20,9 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
     /**
      * Helper to create a test user.
      */
+    /**
+     * Helper to create a test user.
+     */
     protected function createUser(array $attributes = []): User
     {
         return User::create(array_merge([
