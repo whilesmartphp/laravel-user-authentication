@@ -46,23 +46,16 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
     protected function getPackageProviders($app)
     {
         return [
-<<<<<<< HEAD
             'Whilesmart\UserAuthentication\UserAuthenticationServiceProvider',
             SocialiteServiceProvider::class,
 
         ];
     }
 
-=======
-            \Whilesmart\UserAuthentication\UserAuthenticationServiceProvider::class,
-            SocialiteServiceProvider::class,
-        ];
-    }
 
     /**
      * Get package aliases.
      */
->>>>>>> b9530bc (chore: Minor fixes)
     protected function getPackageAliases($app)
     {
         return [
