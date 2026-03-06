@@ -38,4 +38,15 @@ return [
         'client_id' => env('SMARTPINGS_CLIENT_ID'),
         'secret_id' => env('SMARTPINGS_SECRET_ID'),
     ],
+
+    /*
+    | Email Domain Restrictions
+    | Mode: 'whitelist', 'blacklist', or null to allow all emails
+    | Domains: an array of domains
+    */
+
+    'email_restrictions' => [
+        'mode' => env('USER_AUTH_EMAIL_RESTRICTION_MODE', null), // 'whitelist', 'blacklist', or null
+        'domains' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_EMAIL_RESTRICTION_DOMAINS', '')), 'strlen'))),
+    ],
 ];

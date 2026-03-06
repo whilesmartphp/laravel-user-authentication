@@ -1,40 +1,21 @@
 <?php
 
+namespace Whilesmart\UserAuthentication\Tests\Feature;
+
 use Faker\Factory;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
-use Orchestra\Testbench\Attributes\WithMigration;
 use Whilesmart\UserAuthentication\Events\OauthUserAuthenticatedEvent;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Events\UserRegisteredEvent;
 use Whilesmart\UserAuthentication\Models\OauthAccount;
 use Whilesmart\UserAuthentication\Models\User;
+use Whilesmart\UserAuthentication\Tests\TestCase;
 
-use function Orchestra\Testbench\workbench_path;
-
-#[WithMigration]
-class OauthTest extends \Orchestra\Testbench\TestCase
+class OauthTest extends TestCase
 {
-    use RefreshDatabase;
-
-    protected function defineDatabaseMigrations()
-    {
-        $this->loadMigrationsFrom(
-            workbench_path('database/migrations')
-        );
-    }
-
-    protected function getPackageProviders($app)
-    {
-        return [
-            'Laravel\Socialite\SocialiteServiceProvider',
-            'Whilesmart\UserAuthentication\UserAuthenticationServiceProvider',
-        ];
-    }
-
     protected function defineEnvironment($app)
     {
         $app['config']->set('services.github', [
