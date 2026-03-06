@@ -105,23 +105,8 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
             'provider' => 'users',
         ]);
 
-        // $app->singleton('encrypter', function ($app) {
-        //     $config = $app->make('config')->get('app');
-        //     $key = $config['key'];
-
-        //     if (str_starts_with($key, 'base64:')) {
-        //         $key = base64_decode(substr($key, 7));
-        //     }
-
-        //     return new \Illuminate\Encryption\Encrypter($key, $config['cipher']);
-        // });
+        
     }
 
-    // protected function defineRoutes($router)
-    // {
-    //     $router->get('/api', function () {
-    //         return response()->json(['message' => 'Access Granted']);
-    //     })->middleware(['web', 'auth', \Whilesmart\UserAuthentication\Http\Middleware\RedirectIfTwoFactorEnabled::class]);
 
-    // }
 }
