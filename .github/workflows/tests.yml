@@ -64,11 +64,11 @@ jobs:
           COVERAGE=$(php -r "
             \$xml = simplexml_load_file('reports/coverage/coverage.xml');
             \$metrics = \$xml->project->metrics;
-            \$coverage = ((int)\$metrics['coveredelements'] / (int)\$metrics['elements']) * 100;
+            \$coverage = ((int)\$metrics['coveredstatements'] / (int)\$metrics['statements']) * 100;
             echo round(\$coverage, 2);
           ")
           echo "Code coverage: $COVERAGE%"
-          MIN_COVERAGE=64.9
+          MIN_COVERAGE=65.8
           if (( $(echo "$COVERAGE < $MIN_COVERAGE" | bc -l) )); then
             echo "❌ Code coverage ($COVERAGE%) is below the minimum threshold of $MIN_COVERAGE%"
             exit 1
