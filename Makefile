@@ -1,4 +1,4 @@
-.PHONY: help up down install test pint pint-test lint build serve clean prepare restart logs shell
+.PHONY: help up down install test pint pint-test lint phpcs phpstan phpmd build serve clean prepare restart logs shell
 
 help:
 	@echo 'Usage: make [target]'
@@ -33,7 +33,16 @@ pint:
 pint-test:
 	docker compose exec app composer pint:test
 
-lint: pint
+lint: pint phpcs phpstan phpmd
+
+phpcs:
+	docker compose exec app composer phpcs:test
+
+phpstan:
+	docker compose exec app composer phpstan
+
+phpmd:
+	docker compose exec app composer phpmd
 
 build:
 	docker compose exec app composer build
