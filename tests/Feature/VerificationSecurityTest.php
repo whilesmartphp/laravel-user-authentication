@@ -194,7 +194,6 @@ class VerificationSecurityTest extends TestCase
             'contact' => $this->validRegistrationData['email'],
             'code' => \Illuminate\Support\Facades\Hash::make('123456'),
             'purpose' => 'registration_email',
-<<<<<<< HEAD
             'expires_at' => now()->addHours(1),
             'verified_at' => now(),
 
@@ -217,12 +216,6 @@ class VerificationSecurityTest extends TestCase
 
         $response->assertStatus(200);
 
-=======
-            'expires_at' => now()->addMinutes(10),
-            'verified_at' => now(),
-        ]);
-
->>>>>>> origin
         // Step 5: Now registration should succeed
         $response = $this->postJson('/api/register', $this->validRegistrationData);
         $response->assertStatus(201);

@@ -17,7 +17,6 @@ use function Orchestra\Testbench\workbench_path;
 
 #[WithMigration]
 abstract class TestCase extends \Orchestra\Testbench\TestCase
-abstract class TestCase extends \Orchestra\Testbench\TestCase
 {
     use RefreshDatabase;
 
@@ -29,16 +28,9 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
         config()->set('user-authentication.verification.require_email_verification', false);
     }
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        // Default safe config for every test
-        config()->set('user-authentication.verification.require_email_verification', false);
-    }
 
     /**
-     * Helper to create a test user. 
+     * Helper to create a test user.
      */
     protected function createUser(array $attributes = []): User
     {

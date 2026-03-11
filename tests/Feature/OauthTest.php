@@ -14,12 +14,7 @@ use Whilesmart\UserAuthentication\Models\OauthAccount;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Tests\TestCase;
 
-<<<<<<< HEAD
-use function Orchestra\Testbench\workbench_path;
-
 #[WithMigration]
-=======
->>>>>>> origin
 class OauthTest extends TestCase
 {
     protected function defineEnvironment($app)
