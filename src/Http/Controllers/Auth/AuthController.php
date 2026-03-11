@@ -24,6 +24,7 @@ use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Models\OauthAccount;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
+use Whilesmart\UserAuthentication\Rules\EmailDomainRestriction;
 use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
 use Whilesmart\UserAuthentication\Services\TwoFactorService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
@@ -42,7 +43,14 @@ class AuthController extends Controller
 
         try {
             $validationRules = [
-                'email' => 'required|string|email|max:255|unique:users',
+                'email' => [
+                    'required',
+                    'string',
+                    'email',
+                    'max:255',
+                    'unique:users',
+                    new EmailDomainRestriction(),
+                ],
                 'first_name' => 'required|string|max:255',
                 'last_name' => 'string|max:255',
                 'username' => 'string|max:255|unique:users',
@@ -214,7 +222,7 @@ class AuthController extends Controller
 
         /**
          * @var User $user
-        */
+         */
         $user = $request->user();
         $user->currentAccessToken()->delete();
         UserLoggedOutEvent::dispatch($user);
@@ -256,6 +264,7 @@ class AuthController extends Controller
         } catch (InvalidStateException $e) {
             $this->error("OAuth state mismatch for {$driver}");
             $this->error($e->getMessage());
+
             return $this->runAfterHooks(
                 $request,
                 $this->failure('Invalid state. Please try again.', 400),
@@ -377,7 +386,7 @@ class AuthController extends Controller
             // Use default verification system
             $codeLength = config('user-authentication.verification.code_length', 6);
             $verificationCode = str_pad(
-                (string)random_int(0, pow(10, $codeLength) - 1),
+                (string) random_int(0, pow(10, $codeLength) - 1),
                 $codeLength,
                 '0',
                 STR_PAD_LEFT

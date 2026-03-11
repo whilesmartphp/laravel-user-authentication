@@ -660,6 +660,7 @@ class AuthenticationTest extends TestCase
             return $mockService;
         });
 
+    
         $response = $this->postJson('/api/verify-code', [
             'contact' => 'test@example.com',
             'code' => '123456',

@@ -43,6 +43,8 @@ class UserAuthenticationServiceProvider extends ServiceProvider
     public function boot()
     {
 
+        $this->loadTranslationsFrom(__DIR__ . '/../lang', 'user-authentication');
+
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
         $this->publishesMigrations([

@@ -11,6 +11,7 @@ use OpenApi\Attributes as OA;
  * This class contains all the API documentation that can be published
  * to your application for OpenAPI spec generation without needing
  * to publish the actual controllers.
+ *
  * @codeCoverageIgnore
  */
 #[OA\Tag(name: 'Authentication', description: 'Endpoints for user authentication')]
@@ -49,7 +50,7 @@ class UserAuthOpenApiDocs
     )]
     /**
      * @suppressWarnings(PHPMD.UnusedFormalParameter)
-    */
+     */
     public function firebaseAuthCallback(Request $request, string $driver)
     {
     }

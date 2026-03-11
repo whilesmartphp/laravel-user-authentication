@@ -2,6 +2,8 @@
 
 namespace Whilesmart\UserAuthentication\Tests;
 
+namespace Whilesmart\UserAuthentication\Tests;
+
 use Faker\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -15,6 +17,7 @@ use function Orchestra\Testbench\workbench_path;
 
 #[WithMigration]
 abstract class TestCase extends \Orchestra\Testbench\TestCase
+abstract class TestCase extends \Orchestra\Testbench\TestCase
 {
     use RefreshDatabase;
 
@@ -26,6 +29,17 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
         config()->set('user-authentication.verification.require_email_verification', false);
     }
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Default safe config for every test
+        config()->set('user-authentication.verification.require_email_verification', false);
+    }
+
+    /**
+     * Helper to create a test user. 
+     */
     protected function createUser(array $attributes = []): User
     {
         return User::create(array_merge([
@@ -38,8 +52,6 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
 
     /**
      * Define database migrations.
-     *
-     * @return void
      */
     protected function defineDatabaseMigrations()
     {
@@ -48,6 +60,9 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
         );
     }
 
+    /**
+     * Get package providers.
+     */
     protected function getPackageProviders($app)
     {
         return [
@@ -60,6 +75,9 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
         ];
     }
 
+    /**
+     * Get package aliases.
+     */
     protected function getPackageAliases($app)
     {
         return [

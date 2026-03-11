@@ -1,18 +1,15 @@
 <?php
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+namespace Whilesmart\UserAuthentication\Tests\Feature;
+
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Hash;
-use Orchestra\Testbench\Attributes\WithMigration;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
 use Whilesmart\UserAuthentication\Tests\TestCase;
 
-#[WithMigration]
 class VerificationSecurityTest extends TestCase
 {
-    use RefreshDatabase;
-
     private array $validRegistrationData = [
         'email' => 'test@example.com',
         'first_name' => 'John',
@@ -174,7 +171,7 @@ class VerificationSecurityTest extends TestCase
 
         // Step 2: Send verification code
         $response = $this->postJson('/api/send-verification-code', [
-            'contact' => 'test@example.com',
+            'contact' => $this->validRegistrationData['email'],
             'type' => 'email',
             'purpose' => 'registration',
         ]);
@@ -192,11 +189,12 @@ class VerificationSecurityTest extends TestCase
         $this->assertNull($codeRecord->verified_at); // Should not be verified yet
 
         // Create a known verification code for testing
-        VerificationCode::where('contact', 'test@example.com')->delete();
+        VerificationCode::where('contact', $this->validRegistrationData['email'])->delete();
         VerificationCode::create([
-            'contact' => 'test@example.com',
-            'code' => Hash::make('123456'),
+            'contact' => $this->validRegistrationData['email'],
+            'code' => \Illuminate\Support\Facades\Hash::make('123456'),
             'purpose' => 'registration_email',
+<<<<<<< HEAD
             'expires_at' => now()->addHours(1),
             'verified_at' => now(),
 
@@ -219,6 +217,12 @@ class VerificationSecurityTest extends TestCase
 
         $response->assertStatus(200);
 
+=======
+            'expires_at' => now()->addMinutes(10),
+            'verified_at' => now(),
+        ]);
+
+>>>>>>> origin
         // Step 5: Now registration should succeed
         $response = $this->postJson('/api/register', $this->validRegistrationData);
         $response->assertStatus(201);

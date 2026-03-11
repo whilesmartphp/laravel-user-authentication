@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/whilesmart/docs-kit/main/schema/docs.schema.json",
+  "name": "Laravel User Authentication",
+  "description": "A comprehensive Laravel package for user authentication with registration, login, password reset, OAuth, and configurable email/phone verification",
+  "icon": "shield-check",
+  "category": {
+    "language": "php",
+    "framework": "laravel"
+  },
+  "sidebar": [
+    { "title": "Installation", "path": "docs/installation.md" },
+    { "title": "Verification", "path": "docs/verification.md" },
+    { "title": "Customization", "path": "docs/customization.md" }
+  ]
+}
