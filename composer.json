@@ -41,7 +41,8 @@
     "laravel/sanctum": "^4.1",
     "laravel/socialite": "^5.23",
     "kreait/laravel-firebase": "^6.1",
-    "socialiteproviders/apple": "^5.8"
+    "socialiteproviders/apple": "^5.8",
+    "web-auth/webauthn-lib": "^5.0"
   },
   "autoload-dev": {
     "psr-4": {
