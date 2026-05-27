@@ -16,6 +16,12 @@ enum HookAction: string
     case PASSWORD_RESET = 'passwordReset';
     case SEND_VERIFICATION_CODE = 'sendVerificationCode';
     case VERIFY_CODE = 'verifyCode';
+    case PASSKEY_LOGIN_OPTIONS = 'passkeyLoginOptions';
+    case PASSKEY_REGISTER_OPTIONS = 'passkeyRegisterOptions';
+    case PASSKEY_LOGIN = 'passkeyLogin';
+    case PASSKEY_REGISTER = 'passkeyRegister';
+    case PASSKEY_INDEX = 'passkeyIndex';
+    case PASSKEY_DELETE = 'passkeyDelete';
 
     /**
      * Get all predefined hook actions.
