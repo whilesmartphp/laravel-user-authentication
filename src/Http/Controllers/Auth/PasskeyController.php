@@ -4,27 +4,18 @@ namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
-use Webauthn\AuthenticatorAssertionResponse;
-use Webauthn\AuthenticatorAssertionResponseValidator;
-use Webauthn\AuthenticatorAttestationResponse;
-use Webauthn\AuthenticatorAttestationResponseValidator;
-use Webauthn\CeremonyStep\CeremonyStepManagerFactory;
-use Webauthn\CredentialRecord;
 use Webauthn\Exception\InvalidDataException;
-use Webauthn\PublicKeyCredential;
-use Webauthn\PublicKeyCredentialCreationOptions;
-use Webauthn\PublicKeyCredentialRequestOptions;
-use Webauthn\PublicKeyCredentialRpEntity;
-use Webauthn\PublicKeyCredentialUserEntity;
 use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Http\Controllers\Controller;
 use Whilesmart\UserAuthentication\Models\Passkey;
 use Whilesmart\UserAuthentication\Rules\EmailDomainRestriction;
+use Whilesmart\UserAuthentication\Services\PasskeyService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
@@ -35,6 +26,13 @@ class PasskeyController extends Controller
     use HasMiddlewareHooks;
     use Loggable;
 
+
+    private PasskeyService $passkeyService;
+
+    public function __construct(PasskeyService $passkeyService)
+    {
+        $this->passkeyService = $passkeyService;
+    }
 
     /**
      * @throws ExceptionInterface
@@ -53,20 +51,15 @@ class PasskeyController extends Controller
             $response = $this->failure('Validation failed.', 422, [$validator->errors()]);
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER_OPTIONS);
         }
-        $options = new PublicKeyCredentialCreationOptions(
-            rp: new PublicKeyCredentialRpEntity(
-                name: config('app.name'),
-                id: parse_url(config('user-authentication.passkey.domain'), PHP_URL_HOST),
-            ),
-            user: new PublicKeyCredentialUserEntity(
-                name: $request->user()->email,
-                id: $request->user()->id,
-                displayName: $request->user()->name,
-            ),
-            challenge: Str::random(),
-        );
 
-        $response = $this->success(['options' => $options]);
+        $user = $request->user();
+        $options = $this->passkeyService->getRegistrationOptions($user->id, $user->email, $user->name);
+
+        $options = Passkey::webAuthnSerializer()->serialize($options, 'json');
+        $sessionId = "reg_" . Str::uuid()->toString();
+        Cache::add($sessionId, $options, now()->addMinutes(config('user-authentication.passkey.session_lifetime')));
+
+        $response = $this->success(['options' => $options, 'session_id' => $sessionId]);
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER_OPTIONS);
     }
 
@@ -101,19 +94,13 @@ class PasskeyController extends Controller
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN_OPTIONS);
         }
 
-        $allowedCredentials = $user->passkeys()
-            ->get()
-            ->map(fn(Passkey $passkey) => $passkey->getCredential())
-            ->map(fn(CredentialRecord $publicKeyCredentialSource) => $publicKeyCredentialSource->getPublicKeyCredentialDescriptor())
-            ->all();
+        $options = $this->passkeyService->getLoginOptions($user->id);
+        $options = Passkey::webAuthnSerializer()->serialize($options, 'json');
 
-        $options = new PublicKeyCredentialRequestOptions(
-            challenge: Str::random(),
-            rpId: parse_url(config('user-authentication.passkey.domain'), PHP_URL_HOST),
-            allowCredentials: $allowedCredentials,
-        );
+        $sessionId = "log_" . Str::uuid()->toString();
+        Cache::add($sessionId, $options, now()->addMinutes(config('user-authentication.passkey.session_lifetime')));
 
-        $response = $this->success(['options' => Passkey::webAuthnSerializer()->serialize($options, 'json')]);
+        $response = $this->success(['options' => $options, 'session_id' => $sessionId]);
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN_OPTIONS);
     }
 
@@ -128,7 +115,7 @@ class PasskeyController extends Controller
 
         $validationRules = [
             'passkey' => ['required', 'array'],
-            'options' => ['required', 'array']
+            'session_id' => ['required', 'string']
         ];
 
         $validator = Validator::make($request->all(), $validationRules);
@@ -139,52 +126,20 @@ class PasskeyController extends Controller
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
         }
 
-        $data = $request->only(['passkey', 'options']);
+        $data = $request->only(['passkey', 'session_id']);
 
-        $publicKeyCredential = Passkey::webAuthnSerializer()->deserialize(
-            json_encode($data['passkey']),
-            PublicKeyCredential::class,
-            'json'
+        $options = Cache::get($data['session_id']);
+        if (is_null($options)) {
+            $response = $this->failure(__('Invalid session id'));
+            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
+
+        }
+
+        $passkey = $this->passkeyService->verifyPasskey(
+            $data['passkey'],
+            $options,
+            $request->getHost()
         );
-
-        $publicKeyCredentialOptions = Passkey::webAuthnSerializer()->deserialize(
-            json_encode($data['options']),
-            PublicKeyCredentialRequestOptions::class,
-            'json'
-        );
-        if (!$publicKeyCredential->response instanceof AuthenticatorAssertionResponse) {
-            // todo: unable to reproduce this particular case. Might not necessarily be an error
-            $response = $this->failure(__('This passkey is not valid'));
-            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
-
-        }
-
-        $passkey = Passkey::firstWhere('credential_id', $this->base64urlEncode($publicKeyCredential->rawId));
-
-        if (!$passkey) {
-            $response = $this->failure(__('This passkey is not valid'));
-            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
-        }
-
-        try {
-            $csmFactory = new CeremonyStepManagerFactory();
-            $csmFactory->setAllowedOrigins(config('user-authentication.passkey.allowed_origins'));
-            $publicKeyCredentialSource = AuthenticatorAssertionResponseValidator::create(
-                $csmFactory->requestCeremony()
-            )->check(
-                credentialRecord: $passkey->getCredential(),
-                authenticatorAssertionResponse: $publicKeyCredential->response,
-                publicKeyCredentialRequestOptions: $publicKeyCredentialOptions,
-                host: $request->getHost(),
-                userHandle: null,
-            );
-        } catch (\Throwable $e) {
-            $this->error($e->getMessage());
-            $response = $this->failure(__('This passkey is not valid'));
-            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
-        }
-
-        $passkey->update(['data' => Passkey::webAuthnSerializer()->serialize($publicKeyCredentialSource, 'json')]);
 
         $user = $passkey->keyable;
 
@@ -204,18 +159,10 @@ class PasskeyController extends Controller
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
     }
 
-    private function base64urlEncode(string $data): string
-    {
-        // 1. Run standard base64
-        $b64 = base64_encode($data);
-
-        // 2. Replace + with -, / with _, and remove = padding
-        return rtrim(strtr($b64, '+/', '-_'), '=');
-    }
-
     /**
      * Store a newly created resource in storage.
      * @throws ExceptionInterface
+     * @throws \Throwable
      */
     public function register(Request $request): JsonResponse
     {
@@ -223,7 +170,7 @@ class PasskeyController extends Controller
 
         $validationRules = [
             'name' => ['required', 'string', 'max:255'],
-            'options' => ['required', 'array'],
+            'session_id' => ['required', 'string'],
             'passkey' => ['required', 'array'],
         ];
 
@@ -236,43 +183,21 @@ class PasskeyController extends Controller
         }
         $data = $request->all();
 
-        $publicKeyCredential = Passkey::webAuthnSerializer()->deserialize(
-            json_encode($data['passkey']),
-            PublicKeyCredential::class,
-            'json'
-        );
+        $options = Cache::get($data['session_id']);
+        if (is_null($options)) {
+            $response = $this->failure(__('Invalid session id'));
+            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
 
-        $publicKeyCredentialOptions = Passkey::webAuthnSerializer()->deserialize(
-            json_encode($data['options']),
-            PublicKeyCredentialCreationOptions::class,
-            'json'
-        );
-
-
-        if (!$publicKeyCredential->response instanceof AuthenticatorAttestationResponse) {
-            // todo: unable to reproduce this particular case. Might not necessarily be an error
-            $response = $this->failure(__('This passkey is not valid'));
-            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
         }
 
-        try {
-            $csmFactory = new CeremonyStepManagerFactory();
-            $csmFactory->setAllowedOrigins(config('user-authentication.passkey.allowed_origins'));
-            $publicKeyCredentialSource = AuthenticatorAttestationResponseValidator::create(
-                $csmFactory->creationCeremony(),
-            )->check(
-                authenticatorAttestationResponse: $publicKeyCredential->response,
-                publicKeyCredentialCreationOptions: $publicKeyCredentialOptions,
-                host: $request->getHost(),
-            );
-        } catch (\Throwable $e) {
-            $this->error($e->getMessage());
-            $response = $this->failure(__('This passkey is not valid'));
-            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
-        }
+        $publicKeyCredentialSource = $this->passkeyService->getPublicKeyCredentialSource(
+            $data['passkey'],
+            $options,
+            $request->getHost()
+        );
 
         $user = $request->user();
-        $exists = Passkey::where('credential_id', $this->base64urlEncode($publicKeyCredentialSource->publicKeyCredentialId))
+        $exists = Passkey::where('credential_id', $this->passkeyService->getCredentialId($publicKeyCredentialSource))
             ->where('keyable_id', $user->id)
             ->where('keyable_type', config('user-authentication.user_model'))
             ->exists();
@@ -283,7 +208,7 @@ class PasskeyController extends Controller
 
         $request->user()->passkeys()->create([
             'name' => $data['name'],
-            'credential_id' => $this->base64urlEncode($publicKeyCredentialSource->publicKeyCredentialId),
+            'credential_id' => $this->passkeyService->getCredentialId($publicKeyCredentialSource),
             'data' => Passkey::webAuthnSerializer()->serialize($publicKeyCredentialSource, 'json'),
         ]);
         $response = $this->success(message: __('Passkey created'));
