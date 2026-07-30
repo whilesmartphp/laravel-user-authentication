@@ -14,6 +14,7 @@ use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Http\Controllers\Controller;
 use Whilesmart\UserAuthentication\Models\Passkey;
+use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Rules\EmailDomainRestriction;
 use Whilesmart\UserAuthentication\Services\PasskeyService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
@@ -53,7 +54,9 @@ class PasskeyController extends Controller
         }
 
         $user = $request->user();
-        $options = $this->passkeyService->getRegistrationOptions($user->id, $user->email, $user->name);
+        $name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
+        $displayName = $name ?: $user->email;
+        $options = $this->passkeyService->getRegistrationOptions((string) $user->id, $user->email, $displayName);
 
         $options = Passkey::webAuthnSerializer()->serialize($options, 'json');
         $sessionId = "reg_" . Str::uuid()->toString();
@@ -73,7 +76,7 @@ class PasskeyController extends Controller
 
         $validationRules = [
             'email' => [
-                'required',
+                'sometimes',
                 'string',
                 'email',
                 'max:255',
@@ -87,14 +90,18 @@ class PasskeyController extends Controller
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN_OPTIONS);
         }
 
-        $User = config('user-authentication.user_model');
-        $user = $User::where('email', $request->email)->first();
-        if (!$user) {
-            $response = $this->failure(__('User not found'));
-            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN_OPTIONS);
+        $userId = null;
+        if ($request->has('email')) {
+            $User = config('user-authentication.user_model');
+            $user = $User::where('email', $request->email)->first();
+            if (!$user) {
+                $response = $this->failure(__('User not found'));
+                return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN_OPTIONS);
+            }
+            $userId = $user->id;
         }
 
-        $options = $this->passkeyService->getLoginOptions($user->id);
+        $options = $this->passkeyService->getLoginOptions($userId);
         $options = Passkey::webAuthnSerializer()->serialize($options, 'json');
 
         $sessionId = "log_" . Str::uuid()->toString();
@@ -132,7 +139,6 @@ class PasskeyController extends Controller
         if (is_null($options)) {
             $response = $this->failure(__('Invalid session id'));
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
-
         }
 
         $passkey = $this->passkeyService->verifyPasskey(
@@ -143,7 +149,7 @@ class PasskeyController extends Controller
 
         $user = $passkey->keyable;
 
-        if (!$user) {
+        if (!$user instanceof User) {
             $response = $this->failure('Invalid credentials', 401);
 
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
@@ -153,7 +159,7 @@ class PasskeyController extends Controller
         $response = $this->success([
             'token' => $user->createToken('auth-token')->plainTextToken,
             'token_type' => 'Bearer',
-            'user' => auth()->user(),
+            'user' => $user,
         ], 'User successfully logged in', 200);
 
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
@@ -187,7 +193,6 @@ class PasskeyController extends Controller
         if (is_null($options)) {
             $response = $this->failure(__('Invalid session id'));
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
-
         }
 
         $publicKeyCredentialSource = $this->passkeyService->getPublicKeyCredentialSource(
@@ -213,7 +218,6 @@ class PasskeyController extends Controller
         ]);
         $response = $this->success(message: __('Passkey created'));
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
-
     }
 
     public function index(Request $request): JsonResponse
@@ -221,7 +225,6 @@ class PasskeyController extends Controller
         $passkeys = $request->user()->passkeys;
         $response = $this->success(data: ['passkeys' => $passkeys], message: __('Passkey created'));
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_INDEX);
-
     }
 
     /**
