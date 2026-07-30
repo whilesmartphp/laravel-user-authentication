@@ -5,6 +5,7 @@ namespace Whilesmart\UserAuthentication\Tests;
 use Faker\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\SanctumServiceProvider;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\SocialiteServiceProvider;
 use Orchestra\Testbench\Attributes\WithMigration;
@@ -47,8 +48,20 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
     {
         return [
             \Whilesmart\UserAuthentication\UserAuthenticationServiceProvider::class,
+            SanctumServiceProvider::class,
             SocialiteServiceProvider::class,
         ];
+    }
+
+    /**
+     * Define environment setup.
+     */
+    protected function getEnvironmentSetUp($app)
+    {
+        $app['config']->set('auth.guards.sanctum', [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ]);
     }
 
     /**
