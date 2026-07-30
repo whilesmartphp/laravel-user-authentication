@@ -14,6 +14,9 @@ use Webauthn\AttestationStatement\PackedAttestationStatementSupport;
 use Webauthn\CredentialRecord;
 use Webauthn\Denormalizer\WebauthnSerializerFactory;
 
+/**
+ * @property string $data
+ */
 class Passkey extends Model
 {
     use HasFactory;
@@ -22,7 +25,6 @@ class Passkey extends Model
         'name',
         'credential_id',
         'data',
-        'user_id',
         'keyable_type',
         'keyable_id',
     ];
@@ -40,19 +42,18 @@ class Passkey extends Model
             CredentialRecord::class,
             'json'
         );
-
     }
 
     public static function webAuthnSerializer(): SerializerInterface
     {
         $attestationStatementSupportManager = new AttestationStatementSupportManager();
-        $attestationStatementSupportManager->add(new NoneAttestationStatementSupport()); // none is the recommended default
-        $serializers = config('user-authentication.passkey.serializers');
-        if (in_array('packed', $serializers, true)) {
+        $attestationStatementSupportManager->add(new NoneAttestationStatementSupport());
+        $attestations = config('user-authentication.passkey.attestations');
+        if (in_array('packed', $attestations, true)) {
             $manager = new Manager();
             $attestationStatementSupportManager->add(new PackedAttestationStatementSupport($manager));
         }
-        if (in_array('fido', $serializers, true)) {
+        if (in_array('fido', $attestations, true)) {
             $attestationStatementSupportManager->add(new FidoU2FAttestationStatementSupport());
         }
 
