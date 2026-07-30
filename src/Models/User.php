@@ -9,6 +9,16 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Whilesmart\UserAuthentication\Traits\HasPasskeys;
 
+/**
+ * @property int $id
+ * @property string $email
+ * @property string $password
+ * @property string|null $first_name
+ * @property string|null $last_name
+ * @property string|null $username
+ * @property string|null $phone
+ * @property \Illuminate\Support\Carbon|null $email_verified_at
+ */
 class User extends Authenticatable
 {
     use HasApiTokens;
