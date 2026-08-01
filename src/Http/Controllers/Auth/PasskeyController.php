@@ -2,6 +2,7 @@
 
 namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -14,7 +15,6 @@ use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Http\Controllers\Controller;
 use Whilesmart\UserAuthentication\Models\Passkey;
-use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Rules\EmailDomainRestriction;
 use Whilesmart\UserAuthentication\Services\PasskeyService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
@@ -41,7 +41,7 @@ class PasskeyController extends Controller
      */
     public function registerOptions(Request $request): JsonResponse
     {
-        $request = $this->runBeforeHooks($request, HookAction::PASSKEY_LOGIN_OPTIONS);
+        $request = $this->runBeforeHooks($request, HookAction::PASSKEY_REGISTER_OPTIONS);
 
         $validationRules = [
             'name' => ['required', 'string', 'max:255']
@@ -95,7 +95,7 @@ class PasskeyController extends Controller
             $User = config('user-authentication.user_model');
             $user = $User::where('email', $request->email)->first();
             if (!$user) {
-                $response = $this->failure(__('User not found'));
+                $response = $this->failure(__('Invalid credentials'));
                 return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN_OPTIONS);
             }
             $userId = $user->id;
@@ -105,7 +105,14 @@ class PasskeyController extends Controller
         $options = Passkey::webAuthnSerializer()->serialize($options, 'json');
 
         $sessionId = "log_" . Str::uuid()->toString();
-        Cache::add($sessionId, $options, now()->addMinutes(config('user-authentication.passkey.session_lifetime')));
+        Cache::add(
+            $sessionId,
+            json_encode([
+                'options' => $options,
+                'userHandle' => $userId !== null ? (string) $userId : null,
+            ]),
+            now()->addMinutes(config('user-authentication.passkey.session_lifetime'))
+        );
 
         $response = $this->success(['options' => $options, 'session_id' => $sessionId]);
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN_OPTIONS);
@@ -135,21 +142,30 @@ class PasskeyController extends Controller
 
         $data = $request->only(['passkey', 'session_id']);
 
-        $options = Cache::get($data['session_id']);
-        if (is_null($options)) {
+        $cached = Cache::pull($data['session_id']);
+        if (is_null($cached)) {
             $response = $this->failure(__('Invalid session id'));
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
         }
+        $cached = json_decode($cached, true);
+        $options = $cached['options'] ?? $cached;
+        $userHandle = $cached['userHandle'] ?? null;
 
-        $passkey = $this->passkeyService->verifyPasskey(
-            $data['passkey'],
-            $options,
-            $request->getHost()
-        );
+        try {
+            $passkey = $this->passkeyService->verifyPasskey(
+                $data['passkey'],
+                $options,
+                $request->getHost(),
+                $userHandle
+            );
+        } catch (\Exception $e) {
+            $response = $this->failure($e->getMessage(), 400);
+            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
+        }
 
         $user = $passkey->keyable;
 
-        if (!$user instanceof User) {
+        if (!$user instanceof Authenticatable) {
             $response = $this->failure('Invalid credentials', 401);
 
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
@@ -189,22 +205,26 @@ class PasskeyController extends Controller
         }
         $data = $request->all();
 
-        $options = Cache::get($data['session_id']);
+        $options = Cache::pull($data['session_id']);
         if (is_null($options)) {
             $response = $this->failure(__('Invalid session id'));
-            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
+            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
         }
 
-        $publicKeyCredentialSource = $this->passkeyService->getPublicKeyCredentialSource(
-            $data['passkey'],
-            $options,
-            $request->getHost()
-        );
+        try {
+            $publicKeyCredentialSource = $this->passkeyService->getPublicKeyCredentialSource(
+                $data['passkey'],
+                $options,
+                $request->getHost()
+            );
+        } catch (\Exception $e) {
+            $response = $this->failure($e->getMessage(), 400);
+            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
+        }
 
         $user = $request->user();
-        $exists = Passkey::where('credential_id', $this->passkeyService->getCredentialId($publicKeyCredentialSource))
-            ->where('keyable_id', $user->id)
-            ->where('keyable_type', config('user-authentication.user_model'))
+        $exists = $user->passkeys()
+            ->where('credential_id', $this->passkeyService->getCredentialId($publicKeyCredentialSource))
             ->exists();
         if ($exists) {
             $response = $this->failure(__('This passkey already exists'));
@@ -222,8 +242,11 @@ class PasskeyController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $passkeys = $request->user()->passkeys;
-        $response = $this->success(data: ['passkeys' => $passkeys], message: __('Passkey created'));
+        $request = $this->runBeforeHooks($request, HookAction::PASSKEY_INDEX);
+
+        $passkeys = $request->user()->passkeys
+            ->makeHidden(['data', 'keyable_type', 'keyable_id']);
+        $response = $this->success(data: ['passkeys' => $passkeys], message: __('Passkeys retrieved'));
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_INDEX);
     }
 
@@ -232,6 +255,8 @@ class PasskeyController extends Controller
      */
     public function destroy(Request $request, $passkeyId): JsonResponse
     {
+        $request = $this->runBeforeHooks($request, HookAction::PASSKEY_DELETE);
+
         $passkey = $request->user()->passkeys()->find($passkeyId);
         if (!$passkey) {
             $response = $this->failure(__('Passkey not found'), 404);

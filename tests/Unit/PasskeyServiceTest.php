@@ -105,7 +105,7 @@ class PasskeyServiceTest extends TestCase
 
         return $user->passkeys()->create([
             'name' => 'Test Passkey',
-            'credential_id' => 'dGVzdA',
+            'credential_id' => 'dGVzdA-' . uniqid(),
             'data' => $data,
         ]);
     }
