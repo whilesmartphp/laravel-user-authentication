@@ -99,6 +99,8 @@ class SendVerificationCodeEmailListener {
 
 The package supports WebAuthn passkeys for passwordless and email-based login. Enable `USER_AUTH_PASSKEY_RESIDENT_KEYS` to register discoverable credentials that can be used without entering an email first.
 
+If you use a custom user model, add the `Whilesmart\UserAuthentication\Traits\HasPasskeys` trait to it so the passkey polymorphic relation is available.
+
 ```bash
 # .env
 USER_AUTH_PASSKEY_ALLOWED_ORIGINS=https://app.example.com

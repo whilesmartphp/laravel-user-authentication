@@ -22,6 +22,18 @@ This package supports WebAuthn passkeys for passwordless and second-factor authe
 
 Passkeys in this package are stored as WebAuthn credentials linked to the package's user model through a polymorphic relation. Each user can have multiple passkeys (e.g., one on their laptop, one on their phone).
 
+If you configure a custom user model via `user-authentication.user_model`, the model must use the `Whilesmart\UserAuthentication\Traits\HasPasskeys` trait so the passkey relation is available:
+
+```php
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Whilesmart\UserAuthentication\Traits\HasPasskeys;
+
+class User extends Authenticatable
+{
+    use HasPasskeys;
+}
+```
+
 Key features:
 
 - **Configurable resident credentials** — opt-in to discoverable credentials for true passwordless login, or keep them off for second-factor-only use.
