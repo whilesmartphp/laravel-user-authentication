@@ -56,7 +56,7 @@ return [
         'attestations' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_PASSKEY_ATTESTATIONS', 'none')), 'strlen'))), // none,packed, fido
         // Full origins (scheme://host[:port]) allowed to perform WebAuthn ceremonies.
         // Must include the origin where the frontend is served, e.g. https://app.example.com
-        'allowed_origins' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_PASSKEY_ALLOWED_ORIGINS', '')), 'strlen'))), // localhost, google.com, etc..
+        'allowed_origins' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_PASSKEY_ALLOWED_ORIGINS', '')), 'strlen'))), // Must be full origins, e.g. https://localhost, https://app.example.com
         // Whether to request discoverable (resident) credentials.
         // Required for passwordless login without entering an email first.
         'resident_keys' => env('USER_AUTH_PASSKEY_RESIDENT_KEYS', false),
