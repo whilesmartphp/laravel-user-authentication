@@ -21,6 +21,10 @@ class Passkey extends Model
 {
     use HasFactory;
 
+    protected static ?SerializerInterface $webAuthnSerializer = null;
+
+    protected static ?AttestationStatementSupportManager $attestationStatementSupportManager = null;
+
     protected $fillable = [
         'name',
         'credential_id',
@@ -46,17 +50,30 @@ class Passkey extends Model
 
     public static function webAuthnSerializer(): SerializerInterface
     {
-        $attestationStatementSupportManager = new AttestationStatementSupportManager();
-        $attestationStatementSupportManager->add(new NoneAttestationStatementSupport());
-        $attestations = config('user-authentication.passkey.attestations');
-        if (in_array('packed', $attestations, true)) {
-            $manager = new Manager();
-            $attestationStatementSupportManager->add(new PackedAttestationStatementSupport($manager));
-        }
-        if (in_array('fido', $attestations, true)) {
-            $attestationStatementSupportManager->add(new FidoU2FAttestationStatementSupport());
+        if (self::$webAuthnSerializer === null) {
+            self::$webAuthnSerializer = (new WebauthnSerializerFactory(
+                self::attestationStatementSupportManager()
+            ))->create();
         }
 
-        return (new WebauthnSerializerFactory($attestationStatementSupportManager))->create();
+        return self::$webAuthnSerializer;
+    }
+
+    public static function attestationStatementSupportManager(): AttestationStatementSupportManager
+    {
+        if (self::$attestationStatementSupportManager === null) {
+            $manager = new AttestationStatementSupportManager();
+            $manager->add(new NoneAttestationStatementSupport());
+            $attestations = config('user-authentication.passkey.attestations');
+            if (in_array('packed', $attestations, true)) {
+                $manager->add(new PackedAttestationStatementSupport(new Manager()));
+            }
+            if (in_array('fido', $attestations, true)) {
+                $manager->add(new FidoU2FAttestationStatementSupport());
+            }
+            self::$attestationStatementSupportManager = $manager;
+        }
+
+        return self::$attestationStatementSupportManager;
     }
 }

@@ -41,16 +41,17 @@ class PasskeyService
     /**
      * @throws InvalidDataException
      */
-    public function getLoginOptions(?int $userId = null): PublicKeyCredentialRequestOptions
+    public function getLoginOptions(int|string|null $userId = null): PublicKeyCredentialRequestOptions
     {
         if ($userId !== null) {
             $User = config('user-authentication.user_model');
-            $allowedCredentials = Passkey::where('keyable_id', $userId)
-                ->where('keyable_type', $User)
-                ->get()
-                ->map(fn (Passkey $passkey) => $passkey->getCredential())
-                ->map(fn (CredentialRecord $source) => $source->getPublicKeyCredentialDescriptor())
-                ->all();
+            $user = $User::find($userId);
+            $allowedCredentials = $user
+                ? $user->passkeys
+                    ->map(fn (Passkey $passkey) => $passkey->getCredential())
+                    ->map(fn (CredentialRecord $source) => $source->getPublicKeyCredentialDescriptor())
+                    ->all()
+                : [];
         }
 
         return new PublicKeyCredentialRequestOptions(
@@ -91,7 +92,7 @@ class PasskeyService
     /**
      * @throws ExceptionInterface
      */
-    public function verifyPasskey(array $passkey, string $options, string $host): Passkey
+    public function verifyPasskey(array $passkey, string $options, string $host, ?string $userHandle = null): Passkey
     {
         $publicKeyCredential = Passkey::webAuthnSerializer()->deserialize(
             json_encode($passkey),
@@ -105,7 +106,7 @@ class PasskeyService
             'json'
         );
         if (!$publicKeyCredential->response instanceof AuthenticatorAssertionResponse) {
-            throw new Exception(__('This passkey is not valid 2'), 400);
+            throw new Exception(__('This passkey is not valid'), 400);
         }
 
         $validatedPasskey = Passkey::firstWhere('credential_id', $this->base64urlEncode($publicKeyCredential->rawId));
@@ -117,6 +118,7 @@ class PasskeyService
         try {
             $csmFactory = new CeremonyStepManagerFactory();
             $csmFactory->setAllowedOrigins(config('user-authentication.passkey.allowed_origins'));
+            $csmFactory->setAttestationStatementSupportManager(Passkey::attestationStatementSupportManager());
             $publicKeyCredentialSource = AuthenticatorAssertionResponseValidator::create(
                 $csmFactory->requestCeremony()
             )->check(
@@ -124,7 +126,7 @@ class PasskeyService
                 authenticatorAssertionResponse: $publicKeyCredential->response,
                 publicKeyCredentialRequestOptions: $publicKeyCredentialOptions,
                 host: $host,
-                userHandle: null,
+                userHandle: $userHandle,
             );
         } catch (\Throwable $e) {
             $this->error($e->getMessage());
@@ -167,13 +169,14 @@ class PasskeyService
 
 
         if (!$publicKeyCredential->response instanceof AuthenticatorAttestationResponse) {
-            throw new Exception(__('This passkey is not valid 2'), 400);
+            throw new Exception(__('This passkey is not valid'), 400);
         }
 
 
         try {
             $csmFactory = new CeremonyStepManagerFactory();
             $csmFactory->setAllowedOrigins(config('user-authentication.passkey.allowed_origins'));
+            $csmFactory->setAttestationStatementSupportManager(Passkey::attestationStatementSupportManager());
             $publicKeyCredentialSource = AuthenticatorAttestationResponseValidator::create(
                 $csmFactory->creationCeremony(),
             )->check(
