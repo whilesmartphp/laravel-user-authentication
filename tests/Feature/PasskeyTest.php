@@ -61,7 +61,7 @@ class PasskeyTest extends TestCase
         $user = $this->createUser();
         $token = $user->createToken('test')->plainTextToken;
 
-        $service = $this->app->instance(PasskeyService::class, new class () extends PasskeyService {
+        $this->app->instance(PasskeyService::class, new class () extends PasskeyService {
             public function getPublicKeyCredentialSource(array $passkey, string $options, $host): CredentialRecord
             {
                 return new CredentialRecord(
@@ -124,7 +124,7 @@ class PasskeyTest extends TestCase
     public function test_user_can_get_email_based_login_options()
     {
         $user = $this->createUser();
-        $passkey = $this->createPasskey($user);
+        $this->createPasskey($user);
 
         $response = $this->postJson('/api/passkeys/login/options', [
             'email' => $user->email,
@@ -168,14 +168,17 @@ class PasskeyTest extends TestCase
             {
             }
 
-            public function verifyPasskey(array $passkey, string $options, string $host): Passkey
+            public function verifyPasskey(array $passkey, string $options, string $host, ?string $userHandle = null): Passkey
             {
                 return $this->passkey;
             }
         });
 
         $sessionId = 'log_' . uniqid();
-        Cache::put($sessionId, json_encode(['challenge' => 'test']), now()->addMinutes(5));
+        Cache::put($sessionId, json_encode([
+            'options' => json_encode(['challenge' => 'test']),
+            'userHandle' => (string) $user->id,
+        ]), now()->addMinutes(5));
 
         $response = $this->postJson('/api/passkeys/login', [
             'session_id' => $sessionId,
@@ -218,7 +221,9 @@ class PasskeyTest extends TestCase
         ]);
 
         $response->assertStatus(200)
-            ->assertJsonCount(1, 'data.passkeys');
+            ->assertJsonCount(1, 'data.passkeys')
+            ->assertJsonPath('data.passkeys.0.data', null)
+            ->assertJsonPath('data.passkeys.0.keyable_type', null);
     }
 
     public function test_authenticated_user_can_delete_passkey()
@@ -250,7 +255,7 @@ class PasskeyTest extends TestCase
     private function createPasskey($user): Passkey
     {
         $record = new CredentialRecord(
-            publicKeyCredentialId: 'test-id',
+            publicKeyCredentialId: 'test-id-' . uniqid(),
             type: 'public-key',
             transports: ['internal'],
             attestationType: 'none',
@@ -265,7 +270,7 @@ class PasskeyTest extends TestCase
 
         return $user->passkeys()->create([
             'name' => 'Test Passkey',
-            'credential_id' => 'dGVzdA',
+            'credential_id' => 'dGVzdA-' . uniqid(),
             'data' => $data,
         ]);
     }

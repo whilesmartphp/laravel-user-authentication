@@ -12,10 +12,9 @@ return new class () extends Migration {
     {
         Schema::create('passkeys', function (Blueprint $table) {
             $table->id();
-            $table->string('keyable_type');
-            $table->unsignedBigInteger('keyable_id');
-            $table->text('name');
-            $table->string('credential_id'); // Should be binary?
+            $table->morphs('keyable');
+            $table->string('name');
+            $table->string('credential_id')->unique();
             $table->json('data');
             $table->timestamps();
         });
