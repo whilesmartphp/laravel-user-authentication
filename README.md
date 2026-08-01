@@ -9,7 +9,12 @@ A comprehensive Laravel authentication package with support for registration, lo
   * Login with email, phone, or username
   * Password reset functionality
   * OAuth integration (Google, Apple, etc.)
-  
+
+* **Passkey Authentication:**
+  * WebAuthn passwordless login
+  * Email-based passkey login
+  * Discoverable / resident credential registration
+
 * **Email/Phone Verification:**
   * Configurable verification before registration
   * Event-driven integration with any email/SMS provider
@@ -90,6 +95,25 @@ class SendVerificationCodeEmailListener {
 
 **📖 [Complete Verification Setup Guide](docs/verification.md)**
 
+## Passkey Authentication
+
+The package supports WebAuthn passkeys for passwordless and email-based login. Enable `USER_AUTH_PASSKEY_RESIDENT_KEYS` to register discoverable credentials that can be used without entering an email first.
+
+If you use a custom user model, add the `Whilesmart\UserAuthentication\Traits\HasPasskeys` trait to it so the passkey polymorphic relation is available.
+
+```bash
+# .env
+USER_AUTH_PASSKEY_ALLOWED_ORIGINS=https://app.example.com
+USER_AUTH_PASSKEY_DOMAIN=https://app.example.com
+USER_AUTH_PASSKEY_RESIDENT_KEYS=true
+USER_AUTH_PASSKEY_ATTESTATIONS=none
+USER_AUTH_PASSKEY_SESSION_LIFETIME=5
+```
+
+`USER_AUTH_PASSKEY_DOMAIN` must include the scheme (e.g. `https://app.example.com`) because the backend extracts the RP ID host with `parse_url()`. A bare hostname will cause an **"rpId hash mismatch"** error.
+
+**📖 [Passkey Guide](docs/passkey.md)**
+
 ## Environment Variables
 
 All package configuration is now environment-driven. Add these variables to your `.env` file:
@@ -135,6 +159,24 @@ SMARTPINGS_CLIENT_ID=your-client-id
 SMARTPINGS_SECRET_ID=your-secret-id
 ```
 
+### Passkey Settings
+```bash
+# Full frontend origin(s) allowed to perform WebAuthn ceremonies
+USER_AUTH_PASSKEY_ALLOWED_ORIGINS=https://app.example.com
+
+# Relying party domain. Must include the scheme.
+USER_AUTH_PASSKEY_DOMAIN=https://app.example.com
+
+# Attestation formats: none, packed, fido (default: none)
+USER_AUTH_PASSKEY_ATTESTATIONS=none
+
+# Challenge cache lifetime in minutes (default: 5)
+USER_AUTH_PASSKEY_SESSION_LIFETIME=5
+
+# Request discoverable (resident) credentials. Required for passwordless login without email.
+USER_AUTH_PASSKEY_RESIDENT_KEYS=false
+```
+
 ## Available Endpoints
 
 * `POST /api/register` - Register a new user
@@ -147,6 +189,12 @@ SMARTPINGS_SECRET_ID=your-secret-id
 * `GET /api/oauth/{provider}/login` - OAuth login
 * `GET /api/oauth/{provider}/callback` - OAuth callback
 * `POST /api/oauth/firebase/{provider}/callback` - Firebase OAuth callback. See the [Laravel Firebase Package](https://github.com/kreait/laravel-firebase) for Firebase configurations.
+* `POST /api/passkeys/register/options` - Get passkey registration options (auth required)
+* `POST /api/passkeys/register` - Register a passkey (auth required)
+* `POST /api/passkeys/login/options` - Get passkey login options
+* `POST /api/passkeys/login` - Login with a passkey
+* `GET /api/passkeys` - List user passkeys (auth required)
+* `DELETE /api/passkeys/{id}` - Delete a passkey (auth required)
 
 ## Events
 
@@ -189,6 +237,7 @@ Please see the steps [outlined here](https://socialiteproviders.com/Apple/#insta
 
 * **📖 [Installation Guide](docs/installation.md)** - Complete installation instructions
 * **📖 [Email/Phone Verification](docs/verification.md)** - Set up verification with any provider
+* **📖 [Passkey Authentication](docs/passkey.md)** - WebAuthn passkey setup and troubleshooting
 * **📖 [Customization Guide](docs/customization.md)** - Response formatting, middleware hooks
 
 ## Development Commands
