@@ -26,6 +26,7 @@ use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
 use Whilesmart\UserAuthentication\Rules\EmailDomainRestriction;
 use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
+use Whilesmart\UserAuthentication\Services\TwoFactorService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
@@ -122,9 +123,9 @@ class AuthController extends Controller
 
             return $this->runAfterHooks($request, $response, HookAction::REGISTER);
         } catch (\Exception $e) {
-            $this->error($e);
+            $this->error('An error occurred during registration: ' . $e->getMessage(), ['exception' => $e]);
 
-            $response = $this->failure('An error occurred', 500);
+            $response = $this->failure('An error occurred during registration.', 500);
 
             return $this->runAfterHooks($request, $response, HookAction::REGISTER);
         }
@@ -166,6 +167,27 @@ class AuthController extends Controller
                 return $this->runAfterHooks($request, $response, HookAction::LOGIN);
             }
 
+            // FORCE reload the user from the database using package model
+            $UserModel = config('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
+            $user = $UserModel::find($user->id);
+
+            if ($user->hasTwoFactorEnabled()) {
+                $userId = $user->id;
+                $type = $user->twoFactorAuth->type ?? 'totp';
+                $contact = ($type === 'phone') ? $user->phone : $user->email;
+
+                // Call the Service
+                app(TwoFactorService::class)->handleChallenge($user, $type, $contact);
+
+                auth()->logout();
+                session(['2fa:user_id' => $userId, '2fa:contact' => $contact, '2fa:type' => $type]);
+
+                return $this->success([
+                    'two_factor_required' => true,
+                    'method' => $type,
+                ], 'Two-factor authentication required.', 200);
+            }
+
             UserLoggedInEvent::dispatch($user);
 
             $response = $this->success([
@@ -178,7 +200,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             $this->error('An error occurred during login: ' . $e->getMessage(), ['exception' => $e]);
 
-            $response = $this->failure('An error occurred during login', 500);
+            $response = $this->failure('An error occurred during login.', 500);
 
             return $this->runAfterHooks($request, $response, HookAction::LOGIN);
         }
@@ -446,7 +468,9 @@ class AuthController extends Controller
         $purpose = 'registration_' . $type;
         $errorMessage = ucfirst($type) . ' verification required. Please verify your ' . $type . ' first.';
 
-        if ($smartPingsService->isEnabled()) {
+        $useSelfManaged = config('user-authentication.verification.self_managed', true);
+
+        if (! $useSelfManaged && $smartPingsService->isEnabled()) {
             if (! $smartPingsService->isVerified($contact, $type)) {
                 $response = $this->failure($errorMessage, 422);
 

@@ -3,6 +3,7 @@
 namespace Whilesmart\UserAuthentication\Tests\Feature;
 
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Hash;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
 use Whilesmart\UserAuthentication\Tests\TestCase;
@@ -159,6 +160,8 @@ class VerificationSecurityTest extends TestCase
     /** @test */
     public function test_two_step_verification_requires_both_send_and_verify_steps()
     {
+        // Freeze time to avoid microsecond mismatches
+        Date::setTestNow(now());
         Config::set('user-authentication.verification.require_email_verification', true);
 
         // Step 1: Cannot register without any verification
@@ -176,6 +179,7 @@ class VerificationSecurityTest extends TestCase
 
         // Step 3: Registration should still fail even after sending code (not verified yet)
         $response = $this->postJson('/api/register', $this->validRegistrationData);
+
         $response->assertStatus(422)
             ->assertJson(['success' => false, 'message' => 'Email verification required. Please verify your email first.']);
 
@@ -190,9 +194,27 @@ class VerificationSecurityTest extends TestCase
             'contact' => $this->validRegistrationData['email'],
             'code' => \Illuminate\Support\Facades\Hash::make('123456'),
             'purpose' => 'registration_email',
-            'expires_at' => now()->addMinutes(10),
+            'expires_at' => now()->addHours(1),
             'verified_at' => now(),
+
         ]);
+
+        $response = $this->postJson('/api/verify-code', [
+            'contact' => 'test@example.com',
+            'code' => '123456',
+            'type' => 'email',
+            'purpose' => 'registration',
+        ]);
+
+        $verifiedCode = VerificationCode::where('contact', 'test@example.com')->first();
+
+        $this->assertNotNull($verifiedCode, 'Verification code record missing after verification');
+        $this->assertNotNull(
+            $verifiedCode->verified_at,
+            'Verification code was not marked as verified'
+        );
+
+        $response->assertStatus(200);
 
         // Step 5: Now registration should succeed
         $response = $this->postJson('/api/register', $this->validRegistrationData);

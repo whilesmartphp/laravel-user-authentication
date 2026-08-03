@@ -245,4 +245,139 @@ class UserAuthOpenApiDocs
     public function verifyCode()
     {
     }
+
+    #[OA\Post(
+        path: '/2fa/setup',
+        summary: 'Initiate 2FA setup and get secret/QR code',
+        security: [['sanctum' => []]],
+        tags: ['Authentication'],
+        responses: [
+            new OA\Response(response: 200, description: '2FA setup initiated successfully'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+        ]
+    )]
+    public function setupTwoFactor()
+    {
+    }
+
+    #[OA\Post(
+        path: '/2fa/confirm',
+        summary: 'Confirm 2FA setup with OTP code and receive recovery codes',
+        security: [['sanctum' => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['code'],
+                properties: [
+                    new OA\Property(property: 'code', description: 'TOTP code from authenticator app', type: 'string'),
+                ]
+            )
+        ),
+        tags: ['Authentication'],
+        responses: [
+            new OA\Response(response: 200, description: '2FA enabled successfully'),
+            new OA\Response(response: 400, description: 'Setup not initiated'),
+            new OA\Response(response: 422, description: 'Invalid code'),
+        ]
+    )]
+    public function confirmTwoFactor()
+    {
+    }
+
+    #[OA\Post(
+        path: '/2fa/disable',
+        summary: 'Disable 2FA',
+        security: [['sanctum' => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['code'],
+                properties: [
+                    new OA\Property(property: 'code', description: 'TOTP code from authenticator app', type: 'string'),
+                ]
+            )
+        ),
+        tags: ['Authentication'],
+        responses: [
+            new OA\Response(response: 200, description: '2FA disabled successfully'),
+            new OA\Response(response: 400, description: '2FA not enabled'),
+            new OA\Response(response: 422, description: 'Invalid code'),
+        ]
+    )]
+    public function disableTwoFactor()
+    {
+    }
+
+    #[OA\Post(
+        path: '/2fa/verify',
+        summary: 'Verify 2FA login challenge code or recovery code',
+        security: [],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['code'],
+                properties: [
+                    new OA\Property(
+                        property: 'code',
+                        description: 'TOTP code, email code, or recovery code',
+                        type: 'string'
+                    ),
+                ]
+            )
+        ),
+        tags: ['Authentication'],
+        responses: [
+            new OA\Response(response: 200, description: 'Authenticated successfully'),
+            new OA\Response(response: 401, description: 'Session expired'),
+            new OA\Response(response: 422, description: 'Invalid code'),
+        ]
+    )]
+    public function verifyTwoFactor()
+    {
+    }
+
+    #[OA\Post(
+        path: '/2fa/resend',
+        summary: 'Resend 2FA verification code',
+        security: [],
+        tags: ['Authentication'],
+        responses: [
+            new OA\Response(response: 200, description: 'Verification code resent'),
+            new OA\Response(response: 400, description: 'Not applicable for TOTP'),
+            new OA\Response(response: 401, description: 'Session expired'),
+        ]
+    )]
+    public function resendTwoFactor()
+    {
+    }
+
+    #[OA\Get(
+        path: '/2fa/verify-link/{user}',
+        summary: 'Verify magic link',
+        security: [],
+        parameters: [
+            new OA\Parameter(
+                name: 'user',
+                description: 'User ID',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'integer')
+            ),
+            new OA\Parameter(
+                name: 'token',
+                description: 'Magic link token',
+                in: 'query',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        tags: ['Authentication'],
+        responses: [
+            new OA\Response(response: 302, description: 'Redirected to dashboard'),
+            new OA\Response(response: 403, description: 'Expired or invalid link'),
+        ]
+    )]
+    public function verifyMagicLink()
+    {
+    }
 }

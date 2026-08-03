@@ -14,6 +14,7 @@ use Whilesmart\UserAuthentication\Models\OauthAccount;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Tests\TestCase;
 
+#[WithMigration]
 class OauthTest extends TestCase
 {
     protected function defineEnvironment($app)
@@ -63,6 +64,7 @@ class OauthTest extends TestCase
 
     public function test_oauth_callback_creates_new_user_and_oauth_account()
     {
+        $this->withoutExceptionHandling();
         Event::fake();
 
         $socialiteUser = $this->mockSocialiteUser([
