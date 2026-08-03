@@ -19,6 +19,7 @@ return new class () extends Migration {
             } else {
                 $table->string('first_name');
             }
+
         });
     }
 
@@ -32,6 +33,7 @@ return new class () extends Migration {
             $table->dropColumn('username');
             $table->dropColumn('phone');
             $table->renameColumn('first_name', 'name');
+
         });
     }
 };
