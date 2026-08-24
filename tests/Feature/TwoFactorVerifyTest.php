@@ -49,4 +49,43 @@ class TwoFactorVerifyTest extends TestCase
         $this->assertAuthenticatedAs($user);
         $this->assertTrue(session('2fa:verified'));
     }
+
+    /** @test */
+    public function test_email_2fa_code_cannot_be_reused()
+    {
+        $user = $this->createUser();
+        $user->twoFactorAuth()->create([
+            'secret' => 'email-secret',
+            'type' => 'email',
+            'is_enabled' => true,
+        ]);
+
+        \Whilesmart\UserAuthentication\Models\VerificationCode::create([
+            'contact' => $user->email,
+            'code' => \Illuminate\Support\Facades\Hash::make('654321'),
+            'purpose' => 'login_email',
+            'expires_at' => now()->addMinutes(5),
+        ]);
+
+        session([
+            '2fa:user_id' => $user->id,
+            '2fa:contact' => $user->email,
+            '2fa:type' => 'email',
+        ]);
+
+        // First verification succeeds
+        $this->postJson('/api/2fa/verify', ['code' => '654321'])->assertStatus(200);
+
+        // Re-establish the 2FA session for a replay attempt
+        session([
+            '2fa:user_id' => $user->id,
+            '2fa:contact' => $user->email,
+            '2fa:type' => 'email',
+        ]);
+
+        // Replaying the same code must fail
+        $response = $this->postJson('/api/2fa/verify', ['code' => '654321']);
+        $response->assertStatus(422)
+            ->assertJson(['message' => 'Invalid or expired code.']);
+    }
 }

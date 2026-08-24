@@ -52,7 +52,14 @@ class TwoFactorService
             return false;
         }
 
-        return Hash::check($code, $codeEntry->code);
+        if (! Hash::check($code, $codeEntry->code)) {
+            return false;
+        }
+
+        // Invalidate the code immediately to prevent replay attacks.
+        $codeEntry->delete();
+
+        return true;
     }
 
     /**
