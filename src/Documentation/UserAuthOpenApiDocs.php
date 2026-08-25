@@ -75,7 +75,23 @@ class UserAuthOpenApiDocs
         ),
         tags: ['Authentication'],
         responses: [
-            new OA\Response(response: 201, description: 'User registered successfully'),
+            new OA\Response(
+                response: 201,
+                description: 'User registered successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(
+                            property: 'data',
+                            properties: [
+                                new OA\Property(property: 'user', type: 'object'),
+                                new OA\Property(property: 'token', type: 'string'),
+                            ]
+                        ),
+                    ]
+                )
+            ),
             new OA\Response(response: 422, description: 'Validation error'),
         ]
     )]
@@ -101,7 +117,44 @@ class UserAuthOpenApiDocs
         ),
         tags: ['Authentication'],
         responses: [
-            new OA\Response(response: 200, description: 'User successfully logged in'),
+            new OA\Response(
+                response: 200,
+                description: 'User successfully logged in or 2FA challenge required',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(
+                            property: 'data',
+                            oneOf: [
+                                new OA\Schema(
+                                    description: 'Direct login response',
+                                    properties: [
+                                        new OA\Property(property: 'token', type: 'string'),
+                                        new OA\Property(property: 'token_type', type: 'string', example: 'Bearer'),
+                                    ]
+                                ),
+                                new OA\Schema(
+                                    description: 'Two-factor challenge response',
+                                    properties: [
+                                        new OA\Property(
+                                            property: 'two_factor_required',
+                                            type: 'boolean',
+                                            example: true
+                                        ),
+                                        new OA\Property(
+                                            property: 'method',
+                                            type: 'string',
+                                            enum: ['totp', 'email', 'phone']
+                                        ),
+                                        new OA\Property(property: 'two_factor_token', type: 'string'),
+                                    ]
+                                ),
+                            ]
+                        ),
+                    ]
+                )
+            ),
             new OA\Response(response: 401, description: 'Invalid credentials'),
             new OA\Response(response: 500, description: 'Server error'),
         ]
@@ -327,7 +380,22 @@ class UserAuthOpenApiDocs
         ),
         tags: ['Authentication'],
         responses: [
-            new OA\Response(response: 200, description: 'Authenticated successfully'),
+            new OA\Response(
+                response: 200,
+                description: 'Authenticated successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(
+                            property: 'data',
+                            properties: [
+                                new OA\Property(property: 'token', type: 'string'),
+                            ]
+                        ),
+                    ]
+                )
+            ),
             new OA\Response(response: 401, description: 'Session expired'),
             new OA\Response(response: 422, description: 'Invalid code'),
         ]
@@ -342,7 +410,17 @@ class UserAuthOpenApiDocs
         security: [],
         tags: ['Authentication'],
         responses: [
-            new OA\Response(response: 200, description: 'Verification code resent'),
+            new OA\Response(
+                response: 200,
+                description: 'Verification code resent',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'data', type: 'object', nullable: true),
+                    ]
+                )
+            ),
             new OA\Response(response: 400, description: 'Not applicable for TOTP'),
             new OA\Response(response: 401, description: 'Session expired'),
         ]
@@ -373,7 +451,22 @@ class UserAuthOpenApiDocs
         ],
         tags: ['Authentication'],
         responses: [
-            new OA\Response(response: 302, description: 'Redirected to dashboard'),
+            new OA\Response(
+                response: 200,
+                description: 'Authenticated successfully via magic link',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(
+                            property: 'data',
+                            properties: [
+                                new OA\Property(property: 'token', type: 'string'),
+                            ]
+                        ),
+                    ]
+                )
+            ),
             new OA\Response(response: 403, description: 'Expired or invalid link'),
         ]
     )]
