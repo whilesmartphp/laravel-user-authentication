@@ -161,7 +161,7 @@ class AuthController extends Controller
 
             $user = $User::where($identifier_field, $credentials[$identifier_field])->first();
 
-            if (! $user || ! auth()->attempt($credentials)) {
+            if (! $user || ! Hash::check($request->password, $user->password)) {
                 $response = $this->failure('Invalid credentials', 401);
 
                 return $this->runAfterHooks($request, $response, HookAction::LOGIN);
@@ -172,19 +172,17 @@ class AuthController extends Controller
             $user = $UserModel::find($user->id);
 
             if ($user->hasTwoFactorEnabled()) {
-                $userId = $user->id;
                 $type = $user->twoFactorAuth->type ?? 'totp';
                 $contact = ($type === 'phone') ? $user->phone : $user->email;
+                $twoFactorService = app(TwoFactorService::class);
 
                 // Call the Service
-                app(TwoFactorService::class)->handleChallenge($user, $type, $contact);
-
-                auth()->logout();
-                session(['2fa:user_id' => $userId, '2fa:contact' => $contact, '2fa:type' => $type]);
+                $twoFactorService->handleChallenge($user, $type, $contact);
 
                 return $this->success([
                     'two_factor_required' => true,
                     'method' => $type,
+                    'two_factor_token' => $twoFactorService->generatePendingToken($user, $contact, $type),
                 ], 'Two-factor authentication required.', 200);
             }
 
@@ -193,7 +191,7 @@ class AuthController extends Controller
             $response = $this->success([
                 'token' => $user->createToken('auth-token')->plainTextToken,
                 'token_type' => 'Bearer',
-                'user' => auth()->user(),
+                'user' => $user,
             ], 'User successfully logged in', 200);
 
             return $this->runAfterHooks($request, $response, HookAction::LOGIN);

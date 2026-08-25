@@ -270,7 +270,6 @@ Customization points:
 ## Notes for Agents
 
 - The package is **not** a standalone Laravel app; it is a package tested inside an Orchestra Testbench workbench.
-- The `demo/` directory contains a React + Vite frontend. Its `README.md` references passkey endpoints, but those endpoints are not currently implemented in this package; treat that README as stale unless you find matching source code.
 - Always run `composer test` after non-trivial changes.
 - Run `composer pint:test`, `composer phpstan`, and `composer phpmd` before considering lint-clean work complete.
 - When adding new events, models, or config keys, update the relevant documentation in `docs/` and the OpenAPI documentation class in `src/Documentation/UserAuthOpenApiDocs.php`.

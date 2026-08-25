@@ -2,8 +2,8 @@
 
 namespace Whilesmart\UserAuthentication\Services;
 
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
 use Whilesmart\UserAuthentication\Models\MagicLink;
@@ -48,11 +48,11 @@ class TwoFactorService
             ->where('purpose', "login_{$type}")
             ->first();
 
-        if (! $codeEntry || $codeEntry->isExpired()) {
+        if (!$codeEntry || $codeEntry->isExpired()) {
             return false;
         }
 
-        if (! Hash::check($code, $codeEntry->code)) {
+        if (!Hash::check($code, $codeEntry->code)) {
             return false;
         }
 
@@ -63,13 +63,52 @@ class TwoFactorService
     }
 
     /**
+     * Create a short-lived, server-verifiable pending-2FA token.
+     */
+    public function generatePendingToken($user, string $contact, string $type): string
+    {
+        $expiryMinutes = config('user-authentication.verification.code_expiry_minutes', 5);
+
+        return Crypt::encryptString(json_encode([
+            'user_id' => $user->id,
+            'contact' => $contact,
+            'type' => $type,
+            'expires_at' => now()->addMinutes($expiryMinutes)->toDateTimeString(),
+        ]));
+    }
+
+    /**
+     * Decode and validate a pending-2FA token.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function decodePendingToken(string $token): ?array
+    {
+        try {
+            $payload = json_decode(Crypt::decryptString($token), true);
+
+            if (! is_array($payload) || empty($payload['expires_at'])) {
+                return null;
+            }
+
+            if (now()->greaterThan($payload['expires_at'])) {
+                return null;
+            }
+
+            return $payload;
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return null;
+        }
+    }
+
+    /**
      * Generate code and magic link, persist them, and dispatch the event.
      */
     protected function sendSelfManagedChallenge($user, string $type, string $contact): void
     {
         // 1. Generate the numeric code
         $codeLength = config('user-authentication.verification.code_length', 6);
-        $code = str_pad((string) random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
+        $code = str_pad((string)random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
 
         $expiry = config('user-authentication.verification.code_expiry_minutes', 5);
 
@@ -90,11 +129,7 @@ class TwoFactorService
             'expires_at' => now()->addMinutes(config('user-authentication.magic_link.expiry_minutes', 15)),
         ]);
 
-        $magicLinkUrl = URL::temporarySignedRoute(
-            '2fa.verify.link',
-            now()->addMinutes(config('user-authentication.magic_link.expiry_minutes', 15)),
-            ['user' => $user->id, 'token' => $token]
-        );
+        $magicLinkUrl = config('user-authentication.magic_link.url') . "?token={$token}&user={$user->id}";
 
         // 4. Dispatch Event (Addressing Review Point 4: Code is no longer null)
         VerificationCodeGeneratedEvent::dispatch($contact, $code, "login_{$type}", $type, $magicLinkUrl);

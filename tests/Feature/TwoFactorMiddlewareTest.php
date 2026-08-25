@@ -68,8 +68,6 @@ class TwoFactorMiddlewareTest extends TestCase
             'is_enabled' => true,
         ]);
 
-        session(['2fa:user_id' => $user->id]);
-
         $response = $this->actingAs($user)->getJson('/api/test-protected');
 
         $response->assertStatus(403);
