@@ -19,7 +19,7 @@ class MagicLinkTest extends TestCase
         // Create the record in our new magic_links table
         \Whilesmart\UserAuthentication\Models\MagicLink::create([
             'user_id' => $user->id,
-            'token' => $token,
+            'token' => hash('sha256', $token),
             'expires_at' => now()->addMinutes(15),
             'is_used' => false,
         ]);
@@ -38,7 +38,7 @@ class MagicLinkTest extends TestCase
 
         \Whilesmart\UserAuthentication\Models\MagicLink::create([
             'user_id' => $user->id,
-            'token' => $token,
+            'token' => hash('sha256', $token),
             'expires_at' => now()->subMinute(),
             'is_used' => false,
         ]);
@@ -56,7 +56,7 @@ class MagicLinkTest extends TestCase
 
         \Whilesmart\UserAuthentication\Models\MagicLink::create([
             'user_id' => $user->id,
-            'token' => $token,
+            'token' => hash('sha256', $token),
             'expires_at' => now()->addMinutes(15),
             'is_used' => true,
         ]);
