@@ -121,15 +121,16 @@ class TwoFactorService
             ]
         );
 
-        // 3.Instead of just a signed URL, we save it to the new table we created
-        $token = Str::random(64);
+        // 3. Generate a magic link token, store its hash, and build the URL
+        $rawToken = Str::random(64);
         MagicLink::create([
             'user_id' => $user->id,
-            'token' => $token,
+            'token' => hash('sha256', $rawToken),
             'expires_at' => now()->addMinutes(config('user-authentication.magic_link.expiry_minutes', 15)),
         ]);
 
-        $magicLinkUrl = config('user-authentication.magic_link.url') . "?token={$token}&user={$user->id}";
+        $magicLinkUrl = rtrim(config('user-authentication.magic_link.url'), '/')
+            . '?' . http_build_query(['token' => $rawToken, 'user' => $user->id]);
 
         // 4. Dispatch Event (Addressing Review Point 4: Code is no longer null)
         VerificationCodeGeneratedEvent::dispatch($contact, $code, "login_{$type}", $type, $magicLinkUrl);
