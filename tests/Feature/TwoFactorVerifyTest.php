@@ -49,7 +49,7 @@ class TwoFactorVerifyTest extends TestCase
         ]);
 
         $response->assertStatus(200)
-            ->assertJsonPath('token', fn (string $token) => ! empty($token));
+            ->assertJsonPath('data.token', fn (string $token) => ! empty($token));
     }
 
     /** @test */

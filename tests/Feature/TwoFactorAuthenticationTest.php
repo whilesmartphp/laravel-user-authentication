@@ -93,7 +93,7 @@ class TwoFactorAuthenticationTest extends TestCase
         ]);
 
         $response->assertStatus(200)
-            ->assertJsonPath('token', fn (string $token) => ! empty($token));
+            ->assertJsonPath('data.token', fn (string $token) => ! empty($token));
 
         // Assert code was consumed (removed from DB)
         $updatedCodes = $user->fresh()->twoFactorAuth->getRawOriginal('recovery_codes');
@@ -157,7 +157,7 @@ class TwoFactorAuthenticationTest extends TestCase
             'code' => $validCode,
         ]);
         $response->assertStatus(200)
-            ->assertJsonPath('token', fn (string $token) => ! empty($token));
+            ->assertJsonPath('data.token', fn (string $token) => ! empty($token));
     }
 
     /** @test */
