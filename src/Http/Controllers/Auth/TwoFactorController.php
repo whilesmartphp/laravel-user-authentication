@@ -23,6 +23,10 @@ class TwoFactorController extends Controller
         /** @var \Whilesmart\UserAuthentication\Models\User $user */
         $user = $request->user();
 
+        if ($user->hasTwoFactorEnabled()) {
+            return $this->failure('Two-factor authentication is already enabled.', 400);
+        }
+
         // generate fresh secret
         $google2fa = app('pragmarx.google2fa');
         $secret = $google2fa->generateSecretKey();

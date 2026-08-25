@@ -33,6 +33,23 @@ class TwoFactorAuthenticationTest extends TestCase
     }
 
     /** @test */
+    public function test_setup_is_blocked_when_2fa_is_already_enabled()
+    {
+        $user = $this->createUser();
+        $this->actingAs($user, 'sanctum');
+        $user->twoFactorAuth()->create([
+            'secret' => 'KVKFKRJTMR2G6KBV',
+            'type' => 'totp',
+            'is_enabled' => true,
+        ]);
+
+        $response = $this->postJson('/api/2fa/setup');
+
+        $response->assertStatus(400)
+            ->assertJsonFragment(['message' => 'Two-factor authentication is already enabled.']);
+    }
+
+    /** @test */
     public function test_user_can_confirm_and_enable_2fa()
     {
         $user = $this->createUser();
