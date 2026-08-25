@@ -21,8 +21,6 @@ class RedirectIfTwoFactorEnabled
             $contact = ($type === 'phone') ? $user->phone : $user->email;
             $service = app(TwoFactorService::class);
 
-            $service->handleChallenge($user, $type, $contact);
-
             return response()->json([
                 'message' => 'Two-factor authentication required.',
                 'two_factor_required' => true,
