@@ -27,7 +27,7 @@ class MagicLinkTest extends TestCase
         $response = $this->getJson("/api/2fa/verify?token={$token}&user={$user->id}");
 
         $response->assertStatus(200)
-            ->assertJsonPath('token', fn (string $tokenValue) => ! empty($tokenValue));
+            ->assertJsonPath('data.token', fn (string $tokenValue) => ! empty($tokenValue));
     }
 
     /** @test */

@@ -188,14 +188,14 @@ class TwoFactorController extends Controller
         // AUTH SUCCESS
         $token = $user->createToken('auth-token', ['2fa-verified'])->plainTextToken;
 
-        return response()->json(['message' => 'Authenticated successfully.', 'token' => $token]);
+        return $this->success(['token' => $token], 'Authenticated successfully.');
     }
 
     public function completeVerification($user)
     {
         $token = $user->createToken('auth-token', ['2fa-verified'])->plainTextToken;
 
-        return response()->json(['message' => 'Authenticated successfully using recovery code.', 'token' => $token]);
+        return $this->success(['token' => $token], 'Authenticated successfully using recovery code.');
     }
 
     public function verifyLink(Request $request)
@@ -217,7 +217,7 @@ class TwoFactorController extends Controller
 
         $token = $user->createToken('auth-token', ['2fa-verified'])->plainTextToken;
 
-        return response()->json(['message' => 'Authenticated successfully using magic link.', 'token' => $token]);
+        return $this->success(['token' => $token], 'Authenticated successfully using magic link.');
     }
 
     /**
@@ -247,6 +247,6 @@ class TwoFactorController extends Controller
 
         $service->handleChallenge($user, $payload['type'], $payload['contact']);
 
-        return response()->json(['message' => 'A new verification code has been sent.']);
+        return $this->success(message: 'A new verification code has been sent.');
     }
 }

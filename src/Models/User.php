@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasTwoFactorAuth;
 
 /**
@@ -27,7 +26,6 @@ use Whilesmart\UserAuthentication\Traits\HasTwoFactorAuth;
  */
 class User extends Authenticatable
 {
-    use ApiResponse;
     use HasApiTokens;
     use HasFactory;
     use HasTwoFactorAuth;
