@@ -4,7 +4,7 @@ namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Auth;
+use Whilesmart\UserAuthentication\Models\MagicLink;
 use Whilesmart\UserAuthentication\Services\TwoFactorService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 
@@ -117,16 +117,22 @@ class TwoFactorController extends Controller
      */
     public function verify(Request $request)
     {
-        $userId = session('2fa:user_id');
-        $contact = session('2fa:contact');
-        $type = session('2fa:type');
+        $request->validate([
+            'two_factor_token' => 'required|string',
+            'code' => 'required|string',
+        ]);
 
-        if (! $userId) {
-            return response()->json(['message' => 'Session expired.'], 401);
+        $service = app(TwoFactorService::class);
+        $payload = $service->decodePendingToken($request->two_factor_token);
+
+        if (! $payload) {
+            return response()->json(['message' => 'Invalid or expired two-factor token.'], 401);
         }
 
         $userModel = config('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
-        $user = $userModel::find($userId);
+        $user = $userModel::find($payload['user_id']);
+        $contact = $payload['contact'];
+        $type = $payload['type'];
 
         // CASE 1: TOTP including recovery codes
         if ($user->twoFactorAuth && $user->twoFactorAuth->type === 'totp') {
@@ -170,20 +176,14 @@ class TwoFactorController extends Controller
         }
 
         // AUTH SUCCESS
-        Auth::login($user);
-        $token = $user->createToken('auth-token')->plainTextToken;
-        session()->forget(['2fa:user_id', '2fa:contact', '2fa:type']);
-        session(['2fa:verified' => true]);
+        $token = $user->createToken('auth-token', ['2fa-verified'])->plainTextToken;
 
         return response()->json(['message' => 'Authenticated successfully.', 'token' => $token]);
     }
 
     public function completeVerification($user)
     {
-        Auth::login($user);
-        $token = $user->createToken('auth-token')->plainTextToken;
-        session()->forget(['2fa:user_id', '2fa:contact', '2fa:type']);
-        session(['2fa:verified' => true]);
+        $token = $user->createToken('auth-token', ['2fa-verified'])->plainTextToken;
 
         return response()->json(['message' => 'Authenticated successfully using recovery code.', 'token' => $token]);
     }
@@ -191,51 +191,47 @@ class TwoFactorController extends Controller
     public function verifyLink(Request $request)
     {
         // get link that has not been used and matches the token in the request
-        $link = \Whilesmart\UserAuthentication\Models\MagicLink::where('token', $request->token)
+        $link = MagicLink::where('token', $request->token)
             ->where('is_used', false)
             ->first();
 
         // 1. Check if the URL signature is valid
-        if (! $link || $link->isExpired() || ! $request->hasValidSignature()) {
+        if (! $link || $link->isExpired()) {
             return $this->failure('The link has expired or is invalid.', 403);
         }
 
         // 2. Find the user based on the link
         $user = $link->user;
-        // 3. Log them in and set the 2FA verified flag
-        Auth::guard('web')->login($user);
 
         $link->update(['is_used' => true]);
-        session(['2fa:verified' => true]);
 
-        // 4. Redirect them or send a success JSON
-        // Since this is likely an API package, you might redirect to your frontend dashboard
-        $dashboardUrl = config('user-authentication.dashboard_url', '/dashboard');
+        $token = $user->createToken('auth-token', ['2fa-verified'])->plainTextToken;
 
-        return redirect()->away($dashboardUrl);
+        return response()->json(['message' => 'Authenticated successfully using magic link.', 'token' => $token]);
     }
 
     /**
      * Resend the 2FA code (for email/SMS types)
      */
-    public function resend()
+    public function resend(Request $request)
     {
-        $userId = session('2fa:user_id');
-        $contact = session('2fa:contact');
-        $type = session('2fa:type');
+        $request->validate(['two_factor_token' => 'required|string']);
 
-        if (! $userId) {
-            return response()->json(['message' => 'Session expired.'], 401);
+        $service = app(TwoFactorService::class);
+        $payload = $service->decodePendingToken($request->two_factor_token);
+
+        if (! $payload) {
+            return response()->json(['message' => 'Invalid or expired two-factor token.'], 401);
         }
 
-        $userModel = config('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
-        $user = $userModel::find($userId);
-
-        if ($type === 'totp') {
+        if ($payload['type'] === 'totp') {
             return response()->json(['message' => 'TOTP codes are generated by your authenticator app.'], 400);
         }
 
-        app(TwoFactorService::class)->handleChallenge($user, $type, $contact);
+        $userModel = config('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
+        $user = $userModel::find($payload['user_id']);
+
+        $service->handleChallenge($user, $payload['type'], $payload['contact']);
 
         return response()->json(['message' => 'A new verification code has been sent.']);
     }

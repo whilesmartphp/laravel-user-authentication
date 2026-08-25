@@ -43,6 +43,4 @@ Route::post('/2fa/resend', [TwoFactorController::class, 'resend'])
     ->middleware('throttle:3,1'); // Limit to 3 resend attempts per minute
 
 // The Magic Link endpoint (GET request for the email button)
-Route::get('/2fa/verify-link/{user}', [TwoFactorController::class, 'verifyLink'])
-    ->name('2fa.verify.link')
-    ->middleware('signed');
+Route::get('/2fa/verify', [TwoFactorController::class, 'verifyLink']);

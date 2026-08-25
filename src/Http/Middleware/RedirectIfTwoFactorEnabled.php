@@ -4,7 +4,6 @@ namespace Whilesmart\UserAuthentication\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Whilesmart\UserAuthentication\Services\TwoFactorService;
 
 class RedirectIfTwoFactorEnabled
@@ -17,23 +16,18 @@ class RedirectIfTwoFactorEnabled
         /** @var \Whilesmart\UserAuthentication\Models\User|null $user */
         $user = $request->user();
 
-        if ($user && $user->hasTwoFactorEnabled() && ! $request->session()->has('2fa:verified')) {
-            $userId = $user->id;
+        if ($user && $user->hasTwoFactorEnabled() && ! $user->tokenCan('2fa-verified')) {
             $type = $user->twoFactorAuth->type;
             $contact = ($type === 'phone') ? $user->phone : $user->email;
+            $service = app(TwoFactorService::class);
 
-            // use service
-            app(TwoFactorService::class)->handleChallenge($user, $type, $contact);
-
-            Auth::logout();
-            $request->session()->put('2fa:user_id', $userId);
-            $request->session()->put('2fa:contact', $contact); // Remember contact for verification
-            $request->session()->put('2fa:type', $type);
+            $service->handleChallenge($user, $type, $contact);
 
             return response()->json([
                 'message' => 'Two-factor authentication required.',
                 'two_factor_required' => true,
                 'method' => $type,
+                'two_factor_token' => $service->generatePendingToken($user, $contact, $type),
             ], 403);
         }
 

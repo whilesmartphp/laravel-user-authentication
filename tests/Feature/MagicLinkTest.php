@@ -2,7 +2,10 @@
 
 namespace Whilesmart\UserAuthentication\Tests\Feature;
 
-use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Event;
+use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
+use Whilesmart\UserAuthentication\Services\TwoFactorService;
 use Whilesmart\UserAuthentication\Tests\TestCase;
 
 class MagicLinkTest extends TestCase
@@ -21,17 +24,10 @@ class MagicLinkTest extends TestCase
             'is_used' => false,
         ]);
 
-        $url = URL::temporarySignedRoute(
-            '2fa.verify.link',
-            now()->addMinutes(15),
-            ['user' => $user->id, 'token' => $token]
-        );
+        $response = $this->getJson("/api/2fa/verify?token={$token}&user={$user->id}");
 
-        $response = $this->get($url);
-
-        $response->assertRedirect();
-        $this->assertAuthenticatedAs($user);
-        $this->assertTrue(session('2fa:verified'));
+        $response->assertStatus(200)
+            ->assertJsonPath('token', fn (string $tokenValue) => ! empty($tokenValue));
     }
 
     /** @test */
@@ -47,13 +43,7 @@ class MagicLinkTest extends TestCase
             'is_used' => false,
         ]);
 
-        $url = URL::temporarySignedRoute(
-            '2fa.verify.link',
-            now()->addMinutes(15),
-            ['user' => $user->id, 'token' => $token]
-        );
-
-        $response = $this->get($url);
+        $response = $this->getJson("/api/2fa/verify?token={$token}&user={$user->id}");
 
         $response->assertStatus(403);
     }
@@ -71,14 +61,24 @@ class MagicLinkTest extends TestCase
             'is_used' => true,
         ]);
 
-        $url = URL::temporarySignedRoute(
-            '2fa.verify.link',
-            now()->addMinutes(15),
-            ['user' => $user->id, 'token' => $token]
-        );
-
-        $response = $this->get($url);
+        $response = $this->getJson("/api/2fa/verify?token={$token}&user={$user->id}");
 
         $response->assertStatus(403);
+    }
+
+    /** @test */
+    public function test_magic_link_url_uses_configured_base_url()
+    {
+        $user = $this->createUser();
+        Config::set('user-authentication.magic_link.url', 'https://auth.example.com/verify');
+
+        Event::fake([VerificationCodeGeneratedEvent::class]);
+
+        app(TwoFactorService::class)->handleChallenge($user, 'email', $user->email);
+
+        Event::assertDispatched(VerificationCodeGeneratedEvent::class, function ($event) use ($user) {
+            return str_starts_with($event->magicLink, 'https://auth.example.com/verify?token=')
+                && str_contains($event->magicLink, "user={$user->id}");
+        });
     }
 }

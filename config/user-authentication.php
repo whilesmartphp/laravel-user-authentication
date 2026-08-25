@@ -39,6 +39,12 @@ return [
         'secret_id' => env('SMARTPINGS_SECRET_ID'),
     ],
 
+    // Magic link configuration for two-factor authentication
+    'magic_link' => [
+        'url' => env('USER_AUTH_MAGIC_LINK_URL', env('APP_URL') . ''),
+        'expiry_minutes' => env('USER_AUTH_MAGIC_LINK_EXPIRY_MINUTES', 15),
+    ],
+
     /*
     | Email Domain Restrictions
     | Mode: 'whitelist', 'blacklist', or null to allow all emails
