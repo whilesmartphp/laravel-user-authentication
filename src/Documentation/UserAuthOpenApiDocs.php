@@ -391,6 +391,8 @@ class UserAuthOpenApiDocs
                             property: 'data',
                             properties: [
                                 new OA\Property(property: 'token', type: 'string'),
+                                new OA\Property(property: 'token_type', type: 'string', example: 'Bearer'),
+                                new OA\Property(property: 'user', type: 'object'),
                             ]
                         ),
                     ]
@@ -462,6 +464,8 @@ class UserAuthOpenApiDocs
                             property: 'data',
                             properties: [
                                 new OA\Property(property: 'token', type: 'string'),
+                                new OA\Property(property: 'token_type', type: 'string', example: 'Bearer'),
+                                new OA\Property(property: 'user', type: 'object'),
                             ]
                         ),
                     ]
