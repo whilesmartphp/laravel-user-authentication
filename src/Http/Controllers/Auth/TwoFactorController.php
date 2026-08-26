@@ -117,6 +117,18 @@ class TwoFactorController extends Controller
     }
 
     /**
+     * Build a successful authentication response consistent with AuthController@login.
+     */
+    private function authSuccessResponse($user, string $message): \Illuminate\Http\JsonResponse
+    {
+        return $this->success([
+            'token' => $user->createToken('auth-token', ['2fa-verified'])->plainTextToken,
+            'token_type' => 'Bearer',
+            'user' => $user,
+        ], $message);
+    }
+
+    /**
      * Verify the 2FA code (TOTP or Email/SMS)
      */
     public function verify(Request $request)
@@ -150,9 +162,10 @@ class TwoFactorController extends Controller
                 // Might be a recovery code, check if it matches any of the valid recovery codes
                 $recoveryCodes = $user->twoFactorAuth->recovery_codes ?? [];
                 if (in_array($request->code, $recoveryCodes)) {
-                    // If it's a valid recovery code, remove it from the list so it can't be reused
-                    $updatedCodes = array_diff($recoveryCodes, [$request->code]);
-                    $user->twoFactorAuth()->update(['recovery_codes' => $updatedCodes]);
+                    // If it's a valid recovery code, remove it from the list so it can't be reused.
+                    // Use the loaded model instance so Eloquent's encrypted:array cast is honored.
+                    $updatedCodes = array_values(array_diff($recoveryCodes, [$request->code]));
+                    $user->twoFactorAuth->update(['recovery_codes' => $updatedCodes]);
 
                     return $this->completeVerification($user);
                 } else {
@@ -186,16 +199,12 @@ class TwoFactorController extends Controller
         }
 
         // AUTH SUCCESS
-        $token = $user->createToken('auth-token', ['2fa-verified'])->plainTextToken;
-
-        return $this->success(['token' => $token], 'Authenticated successfully.');
+        return $this->authSuccessResponse($user, 'Authenticated successfully.');
     }
 
     public function completeVerification($user)
     {
-        $token = $user->createToken('auth-token', ['2fa-verified'])->plainTextToken;
-
-        return $this->success(['token' => $token], 'Authenticated successfully using recovery code.');
+        return $this->authSuccessResponse($user, 'Authenticated successfully using recovery code.');
     }
 
     public function verifyLink(Request $request)
@@ -215,9 +224,7 @@ class TwoFactorController extends Controller
 
         $link->update(['is_used' => true]);
 
-        $token = $user->createToken('auth-token', ['2fa-verified'])->plainTextToken;
-
-        return $this->success(['token' => $token], 'Authenticated successfully using magic link.');
+        return $this->authSuccessResponse($user, 'Authenticated successfully using magic link.');
     }
 
     /**

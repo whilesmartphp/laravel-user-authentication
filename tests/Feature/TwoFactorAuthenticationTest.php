@@ -93,11 +93,17 @@ class TwoFactorAuthenticationTest extends TestCase
         ]);
 
         $response->assertStatus(200)
-            ->assertJsonPath('data.token', fn (string $token) => ! empty($token));
+            ->assertJsonPath('data.token', fn (string $token) => ! empty($token))
+            ->assertJsonPath('data.token_type', 'Bearer')
+            ->assertJsonPath('data.user.id', $user->id);
+
+        $rawRecoveryCodes = $user->fresh()->twoFactorAuth->getRawOriginal('recovery_codes');
 
         // Assert code was consumed (removed from DB)
-        $updatedCodes = $user->fresh()->twoFactorAuth->getRawOriginal('recovery_codes');
-        $this->assertStringNotContainsString('ABCDE12345', $updatedCodes);
+        $this->assertStringNotContainsString('ABCDE12345', $rawRecoveryCodes);
+
+        // Assert the remaining codes are still encrypted at rest, not stored as plain JSON.
+        $this->assertNull(json_decode($rawRecoveryCodes, true));
     }
 
     /** @test */
@@ -157,7 +163,9 @@ class TwoFactorAuthenticationTest extends TestCase
             'code' => $validCode,
         ]);
         $response->assertStatus(200)
-            ->assertJsonPath('data.token', fn (string $token) => ! empty($token));
+            ->assertJsonPath('data.token', fn (string $token) => ! empty($token))
+            ->assertJsonPath('data.token_type', 'Bearer')
+            ->assertJsonPath('data.user.id', $user->id);
     }
 
     /** @test */
