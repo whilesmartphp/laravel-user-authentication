@@ -38,7 +38,8 @@
     "laravel/socialite": "^5.23",
     "smartpings/php-sdk": "dev-main",
     "kreait/laravel-firebase": "^6.1",
-    "socialiteproviders/apple": "^5.8"
+    "socialiteproviders/apple": "^5.8",
+    "pragmarx/google2fa-laravel": "^2.3"
   },
   "autoload-dev": {
     "psr-4": {

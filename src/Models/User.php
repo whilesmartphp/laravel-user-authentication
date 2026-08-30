@@ -7,11 +7,28 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Whilesmart\UserAuthentication\Traits\HasTwoFactorAuth;
 
+/**
+ * @property int $id
+ * @property string $email
+ * @property string $password
+ * @property string|null $first_name
+ * @property string|null $last_name
+ * @property string|null $phone
+ * @property string|null $two_factor_type
+ * @property-read \Whilesmart\UserAuthentication\Models\TwoFactorAuth|null $twoFactorAuth
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, OauthAccount> $oauthAccounts
+ *
+ * @method bool hasTwoFactorEnabled()
+ *
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
 class User extends Authenticatable
 {
     use HasApiTokens;
     use HasFactory;
+    use HasTwoFactorAuth;
     use Notifiable;
 
     /**
@@ -26,6 +43,7 @@ class User extends Authenticatable
         'last_name',
         'username',
         'phone',
+
         'email_verified_at',
     ];
 
@@ -37,6 +55,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+
     ];
 
     /**
@@ -49,6 +68,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+
         ];
     }
 }

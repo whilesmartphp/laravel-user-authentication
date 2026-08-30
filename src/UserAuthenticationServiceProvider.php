@@ -72,6 +72,15 @@ class UserAuthenticationServiceProvider extends ServiceProvider
             }
         }
 
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+
+        // This is vital for Bruno/Web testing:
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__ . '/../database/migrations' => database_path('migrations'),
+            ], 'migrations');
+        }
+
         $this->publishes([
             __DIR__ . '/../routes/user-authentication.php' => base_path('routes/user-authentication.php'),
         ], ['laravel-user-authentication',
@@ -93,5 +102,11 @@ class UserAuthenticationServiceProvider extends ServiceProvider
                 'Http/Documentation/UserAuthOpenApiDocs.php'
             ),
         ], ['laravel-user-authentication', 'laravel-user-authentication-docs', 'laravel-user-authentication-openapi']);
+
+        // Register Middleware
+        $this->app['router']->aliasMiddleware(
+            'two-factor',
+            \Whilesmart\UserAuthentication\Http\Middleware\RedirectIfTwoFactorEnabled::class
+        );
     }
 }
