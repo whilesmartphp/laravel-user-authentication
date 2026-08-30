@@ -14,12 +14,17 @@ class TwoFactorService
     /**
      * Handle the 2FA challenge flow (sending codes or magic links).
      */
-    public function handleChallenge($user, string $type, string $contact): void
-    {
+    public function handleChallenge(
+        $user,
+        string $type,
+        string $contact,
+        string $purpose = 'login',
+        bool $sendMagicLink = true
+    ): void {
         $smartPings = app(SmartPingsVerificationService::class);
 
         if ($type === 'totp') {
-            // TOTP is handled by the device app, no code needs to be sent.
+            // TOTP is handled by the device app, no code or magic link needs to be sent.
             return;
         }
 
@@ -30,13 +35,13 @@ class TwoFactorService
         }
 
         // Default: Generate and send our own code/link
-        $this->sendSelfManagedChallenge($user, $type, $contact);
+        $this->sendSelfManagedChallenge($user, $type, $contact, $purpose, $sendMagicLink);
     }
 
     /**
      * Consolidate verification logic (Review Point 7)
      */
-    public function verifyCode(string $contact, string $code, string $type): bool
+    public function verifyCode(string $contact, string $code, string $type, string $purpose = 'login'): bool
     {
         $smartPings = app(SmartPingsVerificationService::class);
 
@@ -45,7 +50,7 @@ class TwoFactorService
         }
 
         $codeEntry = VerificationCode::where('contact', $contact)
-            ->where('purpose', "login_{$type}")
+            ->where('purpose', "{$purpose}_{$type}")
             ->first();
 
         if (!$codeEntry || $codeEntry->isExpired()) {
@@ -104,8 +109,13 @@ class TwoFactorService
     /**
      * Generate code and magic link, persist them, and dispatch the event.
      */
-    protected function sendSelfManagedChallenge($user, string $type, string $contact): void
-    {
+    protected function sendSelfManagedChallenge(
+        $user,
+        string $type,
+        string $contact,
+        string $purpose = 'login',
+        bool $sendMagicLink = true
+    ): void {
         // 1. Generate the numeric code
         $codeLength = config('user-authentication.verification.code_length', 6);
         $code = str_pad((string)random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
@@ -114,25 +124,29 @@ class TwoFactorService
 
         // 2. Persist the numeric code
         VerificationCode::updateOrCreate(
-            ['contact' => $contact, 'purpose' => "login_{$type}"],
+            ['contact' => $contact, 'purpose' => "{$purpose}_{$type}"],
             [
                 'code' => Hash::make($code),
                 'expires_at' => now()->addMinutes($expiry),
             ]
         );
 
-        // 3. Generate a magic link token, store its hash, and build the URL
-        $rawToken = Str::random(64);
-        MagicLink::create([
-            'user_id' => $user->id,
-            'token' => hash('sha256', $rawToken),
-            'expires_at' => now()->addMinutes(config('user-authentication.magic_link.expiry_minutes', 15)),
-        ]);
+        $magicLinkUrl = null;
 
-        $magicLinkUrl = rtrim(config('user-authentication.magic_link.url'), '/')
-            . '?' . http_build_query(['token' => $rawToken, 'user' => $user->id]);
+        // 3. Generate a magic link token, store its hash, and build the URL
+        if ($sendMagicLink) {
+            $rawToken = Str::random(64);
+            MagicLink::create([
+                'user_id' => $user->id,
+                'token' => hash('sha256', $rawToken),
+                'expires_at' => now()->addMinutes(config('user-authentication.magic_link.expiry_minutes', 15)),
+            ]);
+
+            $magicLinkUrl = rtrim(config('user-authentication.magic_link.url'), '/')
+                . '?' . http_build_query(['token' => $rawToken]);
+        }
 
         // 4. Dispatch Event (Addressing Review Point 4: Code is no longer null)
-        VerificationCodeGeneratedEvent::dispatch($contact, $code, "login_{$type}", $type, $magicLinkUrl);
+        VerificationCodeGeneratedEvent::dispatch($contact, $code, "{$purpose}_{$type}", $type, $magicLinkUrl);
     }
 }

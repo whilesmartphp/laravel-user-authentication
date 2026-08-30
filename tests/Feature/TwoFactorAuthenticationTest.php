@@ -260,6 +260,76 @@ class TwoFactorAuthenticationTest extends TestCase
     }
 
     /** @test */
+    public function test_user_can_disable_email_2fa_with_verification_code()
+    {
+        $user = $this->createUser();
+        $this->actingAs($user, 'sanctum');
+        $user->twoFactorAuth()->create([
+            'secret' => 'email-secret',
+            'type' => 'email',
+            'is_enabled' => true,
+        ]);
+
+        $service = app(TwoFactorService::class);
+        $pendingToken = $service->generatePendingToken($user, $user->email, 'email');
+
+        \Whilesmart\UserAuthentication\Models\VerificationCode::create([
+            'contact' => $user->email,
+            'code' => \Illuminate\Support\Facades\Hash::make('654321'),
+            'purpose' => 'disable_2fa_email',
+            'expires_at' => now()->addMinutes(5),
+        ]);
+
+        $response = $this->postJson('/api/2fa/disable', [
+            'two_factor_token' => $pendingToken,
+            'code' => '000000',
+        ]);
+        $response->assertStatus(422)
+            ->assertJsonFragment(['message' => 'Invalid or expired code.']);
+
+        $response = $this->postJson('/api/2fa/disable', [
+            'two_factor_token' => $pendingToken,
+            'code' => '654321',
+        ]);
+        $response->assertStatus(200)
+            ->assertJsonFragment(['message' => 'Two-factor authentication has been disabled.']);
+
+        $this->assertDatabaseMissing('two_factor_auths', [
+            'authenticatable_id' => $user->id,
+        ]);
+    }
+
+    /** @test */
+    public function test_disable_email_2fa_sends_verification_code()
+    {
+        $user = $this->createUser();
+        $this->actingAs($user, 'sanctum');
+        $user->twoFactorAuth()->create([
+            'secret' => 'email-secret',
+            'type' => 'email',
+            'is_enabled' => true,
+        ]);
+
+        \Illuminate\Support\Facades\Event::fake([
+            \Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent::class,
+        ]);
+
+        $response = $this->postJson('/api/2fa/disable');
+        $response->assertStatus(200)
+            ->assertJsonStructure(['data' => ['two_factor_token']])
+            ->assertJsonFragment(['message' => 'A verification code has been sent to complete 2FA disable.']);
+
+        \Illuminate\Support\Facades\Event::assertDispatched(
+            \Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent::class,
+            function ($event) use ($user) {
+                return $event->contact === $user->email
+                    && $event->purpose === 'disable_2fa_email'
+                    && $event->magicLink === null;
+            }
+        );
+    }
+
+    /** @test */
     public function test_resend_fails_for_totp()
     {
         $user = $this->createUser();

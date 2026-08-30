@@ -93,11 +93,18 @@ class TwoFactorController extends Controller
     }
 
     /**
-     * Disable 2fa
+     * Disable 2fa.
+     *
+     * - TOTP: requires a TOTP code or recovery code.
+     * - Email/phone: first call sends a verification code and returns a pending
+     *   token; second call verifies the code and disables 2FA.
      */
     public function disable(Request $request)
     {
-        $request->validate(['code' => 'required|string']);
+        $request->validate([
+            'code' => 'nullable|string',
+            'two_factor_token' => 'nullable|string',
+        ]);
 
         /** @var \Whilesmart\UserAuthentication\Models\User $user */
         $user = $request->user();
@@ -106,14 +113,97 @@ class TwoFactorController extends Controller
             return $this->failure('Two-factor authentication is not enabled.', 400);
         }
 
+        $type = $user->twoFactorAuth->type;
+
+        if ($type === 'totp') {
+            return $this->disableTotp($user, $request->code);
+        }
+
+        return $this->disableEmailOrPhone($user, $type, $request);
+    }
+
+    /**
+     * Disable TOTP-based 2FA.
+     */
+    private function disableTotp($user, ?string $code): \Illuminate\Http\JsonResponse
+    {
+        $recoveryCodes = $user->twoFactorAuth->recovery_codes;
+
+        // If the user has exhausted their recovery codes, allow disabling 2FA with
+        // just the bearer token so they are not permanently locked out.
+        if (is_array($recoveryCodes) && $recoveryCodes === []) {
+            $user->twoFactorAuth()->delete();
+
+            return $this->success([
+                'message' => 'Two-factor authentication has been disabled.',
+            ]);
+        }
+
+        if (! $code) {
+            return $this->failure('A TOTP code or recovery code is required.', 422);
+        }
+
+        $recoveryCodes ??= [];
+
+        // Recovery codes can be used to disable 2FA when the authenticator device is lost.
+        if (strlen($code) > 6) {
+            if (in_array($code, $recoveryCodes)) {
+                $user->twoFactorAuth()->delete();
+
+                return $this->success([
+                    'message' => 'Two-factor authentication has been disabled using a recovery code.',
+                ]);
+            }
+
+            return $this->failure('Invalid or expired recovery code.', 422);
+        }
+
         $google2fa = app('pragmarx.google2fa');
-        if ($google2fa->verifyKey($user->twoFactorAuth->secret, $request->code)) {
-            $user->twoFactorAuth()->delete(); // remove the record on table
+        if ($google2fa->verifyKey($user->twoFactorAuth->secret, $code)) {
+            $user->twoFactorAuth()->delete();
 
             return $this->success(['message' => 'Two-factor authentication has been disabled.']);
         }
 
         return $this->failure('Invalid code. Could not disable 2FA.', 422);
+    }
+
+    /**
+     * Disable email/phone-based 2FA.
+     */
+    private function disableEmailOrPhone($user, string $type, Request $request): \Illuminate\Http\JsonResponse
+    {
+        $contact = ($type === 'phone') ? $user->phone : $user->email;
+        $service = app(TwoFactorService::class);
+
+        if ($request->code && $request->two_factor_token) {
+            $payload = $service->decodePendingToken($request->two_factor_token);
+
+            if (
+                ! $payload
+                || $payload['user_id'] !== $user->id
+                || $payload['type'] !== $type
+                || $payload['contact'] !== $contact
+            ) {
+                return $this->failure('Invalid or expired two-factor token.', 401);
+            }
+
+            if (! $service->verifyCode($contact, $request->code, $type, 'disable_2fa')) {
+                return $this->failure('Invalid or expired code.', 422);
+            }
+
+            $user->twoFactorAuth()->delete();
+
+            return $this->success(['message' => 'Two-factor authentication has been disabled.']);
+        }
+
+        $service->handleChallenge($user, $type, $contact, 'disable_2fa', false);
+
+        return $this->success([
+            'two_factor_required' => true,
+            'method' => $type,
+            'two_factor_token' => $service->generatePendingToken($user, $contact, $type),
+        ], 'A verification code has been sent to complete 2FA disable.');
     }
 
     /**
