@@ -342,17 +342,26 @@ class UserAuthOpenApiDocs
         summary: 'Disable 2FA',
         security: [['sanctum' => []]],
         requestBody: new OA\RequestBody(
-            required: true,
             content: new OA\JsonContent(
-                required: ['code'],
                 properties: [
-                    new OA\Property(property: 'code', description: 'TOTP code from authenticator app', type: 'string'),
+                    new OA\Property(
+                        property: 'code',
+                        description: 'TOTP code, recovery code, or email/phone verification code.',
+                        type: 'string',
+                        nullable: true
+                    ),
+                    new OA\Property(
+                        property: 'two_factor_token',
+                        description: 'Pending token returned by the first disable call for email/phone 2FA.',
+                        type: 'string',
+                        nullable: true
+                    ),
                 ]
             )
         ),
         tags: ['Authentication'],
         responses: [
-            new OA\Response(response: 200, description: '2FA disabled successfully'),
+            new OA\Response(response: 200, description: '2FA disabled or verification code sent'),
             new OA\Response(response: 400, description: '2FA not enabled'),
             new OA\Response(response: 422, description: 'Invalid code'),
         ]
@@ -432,17 +441,10 @@ class UserAuthOpenApiDocs
     }
 
     #[OA\Get(
-        path: '/2fa/verify-link/{user}',
+        path: '/2fa/verify',
         summary: 'Verify magic link',
         security: [],
         parameters: [
-            new OA\Parameter(
-                name: 'user',
-                description: 'User ID',
-                in: 'path',
-                required: true,
-                schema: new OA\Schema(type: 'integer')
-            ),
             new OA\Parameter(
                 name: 'token',
                 description: 'Magic link token',

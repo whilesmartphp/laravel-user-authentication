@@ -63,7 +63,7 @@ class MagicLinkTest extends TestCase
             'is_used' => true,
         ]);
 
-        $response = $this->getJson("/api/2fa/verify?token={$token}&user={$user->id}");
+        $response = $this->getJson("/api/2fa/verify?token={$token}");
 
         $response->assertStatus(403);
     }
@@ -78,9 +78,40 @@ class MagicLinkTest extends TestCase
 
         app(TwoFactorService::class)->handleChallenge($user, 'email', $user->email);
 
-        Event::assertDispatched(VerificationCodeGeneratedEvent::class, function ($event) use ($user) {
+        Event::assertDispatched(VerificationCodeGeneratedEvent::class, function ($event) {
             return str_starts_with($event->magicLink, 'https://auth.example.com/verify?token=')
-                && str_contains($event->magicLink, "user={$user->id}");
+                && ! str_contains($event->magicLink, 'user=');
         });
+    }
+
+    /** @test */
+    public function test_totp_user_can_authenticate_via_magic_link_without_totp_code()
+    {
+        $user = \Whilesmart\UserAuthentication\Models\User::create([
+            'first_name' => 'Test',
+            'email' => 'totp-magic-auth@example.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        $user->twoFactorAuth()->create([
+            'type' => 'totp',
+            'is_enabled' => true,
+            'secret' => 'KVKFKRJTMR2G6KBV',
+        ]);
+
+        $token = \Illuminate\Support\Str::random(64);
+        \Whilesmart\UserAuthentication\Models\MagicLink::create([
+            'user_id' => $user->id,
+            'token' => hash('sha256', $token),
+            'expires_at' => now()->addMinutes(15),
+            'is_used' => false,
+        ]);
+
+        $response = $this->getJson("/api/2fa/verify?token={$token}");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.token', fn (string $tokenValue) => ! empty($tokenValue))
+            ->assertJsonPath('data.token_type', 'Bearer')
+            ->assertJsonPath('data.user.id', $user->id);
     }
 }
