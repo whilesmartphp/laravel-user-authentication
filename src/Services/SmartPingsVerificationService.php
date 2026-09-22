@@ -23,6 +23,14 @@ class SmartPingsVerificationService
             $secretId = config('user-authentication.smartpings.secret_id');
 
             if ($clientId && $secretId) {
+                if (! $this->sdkInstalled()) {
+                    throw new RuntimeException(
+                        'SmartPings verification is enabled but smartpings/php-sdk is not installed.' .
+                        ' Run composer require smartpings/php-sdk, or set' .
+                        ' user-authentication.verification.provider to something else.'
+                    );
+                }
+
                 $this->smartPings = SmartpingsService::create($clientId, $secretId);
             } else {
                 \Log::error(
@@ -34,6 +42,12 @@ class SmartPingsVerificationService
                 );
             }
         }
+    }
+
+    /** Whether the optional SDK is present. Overridden in tests. */
+    protected function sdkInstalled(): bool
+    {
+        return class_exists(SmartpingsService::class);
     }
 
     public function isEnabled(): bool

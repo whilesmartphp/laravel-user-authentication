@@ -105,6 +105,25 @@ class VerificationSecurityTest extends TestCase
     }
 
     /** @test */
+    public function test_smartpings_says_so_when_the_sdk_is_not_installed()
+    {
+        Config::set('user-authentication.verification.provider', 'smartpings');
+        Config::set('user-authentication.verification.self_managed', false);
+        Config::set('user-authentication.smartpings.client_id', 'a-client');
+        Config::set('user-authentication.smartpings.secret_id', 'a-secret');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('smartpings/php-sdk is not installed');
+
+        new class () extends \Whilesmart\UserAuthentication\Services\SmartPingsVerificationService {
+            protected function sdkInstalled(): bool
+            {
+                return false;
+            }
+        };
+    }
+
+    /** @test */
     public function test_smartpings_fallback_throws_exception_when_credentials_missing()
     {
         // Enable SmartPings but don't provide credentials
