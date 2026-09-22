@@ -182,11 +182,22 @@ php artisan vendor:publish --tag="laravel-user-authentication-config"
 php artisan vendor:publish --provider="Whilesmart\UserAuthentication\UserAuthenticationServiceProvider"
 ```
 
+## Apple Oauth 
+Apple Oauth is provided by SocialLite Providers.
+Please see the steps [outlined here](https://socialiteproviders.com/Apple/#installation-basic-usage) to configure Apple Oauth
 ## Documentation
 
 * **📖 [Installation Guide](docs/installation.md)** - Complete installation instructions
 * **📖 [Email/Phone Verification](docs/verification.md)** - Set up verification with any provider
 * **📖 [Customization Guide](docs/customization.md)** - Response formatting, middleware hooks
+
+## Development Commands
+- `composer test` - Run unit tests
+- `composer phpmd` - Run Mess Detector checks
+- `composer phpstan` - Run Static Analysis checks
+- `composer phpcs` - Run PHP code style checks
+- `composer pint` - Run Laravel code style checks
+- `composer openapi` - Run open api documentation generation
 
 ## License
 

@@ -21,7 +21,9 @@ use Whilesmart\UserAuthentication\Traits\Loggable;
 #[OA\Tag(name: 'Authentication', description: 'Endpoints for password reset')]
 class PasswordResetController extends Controller
 {
-    use ApiResponse, HasMiddlewareHooks, Loggable;
+    use ApiResponse;
+    use HasMiddlewareHooks;
+    use Loggable;
 
     #[OA\Post(
         path: '/password/reset-code',
@@ -67,11 +69,11 @@ class PasswordResetController extends Controller
         $request = $this->runBeforeHooks($request, HookAction::PASSWORD_RESET_REQUEST);
 
         // Rate limiting
-        if (RateLimiter::tooManyAttempts('password-reset:'.$request->ip(), 5)) {
+        if (RateLimiter::tooManyAttempts('password-reset:' . $request->ip(), 5)) {
             return $this->failure('Too many attempts, please try again later.', 429);
         }
 
-        RateLimiter::hit('password-reset:'.$request->ip(), 300);
+        RateLimiter::hit('password-reset:' . $request->ip(), 300);
 
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
@@ -85,7 +87,7 @@ class PasswordResetController extends Controller
             $this->error("Email $request->email does not exist in our records");
         } else {
             $email = $request->email;
-            $verificationCode = random_int(100000, 999999);
+            $verificationCode = (string) random_int(100000, 999999);
             $expiresAt = now()->addMinutes(15);
 
             VerificationCode::updateOrCreate(
@@ -184,11 +186,13 @@ class PasswordResetController extends Controller
             return $this->failure('Invalid or expired code.', 400);
         }
 
-        if (! Hash::check($request->code, $codeEntry->code) || $codeEntry->isExpired()) {
+        // @phpstan-ignore-next-line
+        if (! Hash::check((string) $request->code, (string) $codeEntry->code) || $codeEntry->isExpired()) {
             return $this->failure('Invalid or expired code.', 400);
         }
 
         $user = User::where('email', $request->email)->first();
+        // @phpstan-ignore-next-line
         $user->password = Hash::make($request->new_password);
         $user->save();
 

@@ -2,6 +2,9 @@
 
 namespace Whilesmart\UserAuthentication\Services;
 
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
+use RuntimeException;
 use Smartpings\Messaging\SmartpingsService;
 
 class SmartPingsVerificationService
@@ -20,12 +23,31 @@ class SmartPingsVerificationService
             $secretId = config('user-authentication.smartpings.secret_id');
 
             if ($clientId && $secretId) {
+                if (! $this->sdkInstalled()) {
+                    throw new RuntimeException(
+                        'SmartPings verification is enabled but smartpings/php-sdk is not installed.' .
+                        ' Run composer require smartpings/php-sdk, or set' .
+                        ' user-authentication.verification.provider to something else.'
+                    );
+                }
+
                 $this->smartPings = SmartpingsService::create($clientId, $secretId);
             } else {
-                \Log::error('SmartPings is enabled but client_id or secret_id is missing. Cannot proceed with verification.');
-                throw new \InvalidArgumentException('SmartPings verification is enabled but credentials are missing. Please configure SMARTPINGS_CLIENT_ID and SMARTPINGS_SECRET_ID environment variables.');
+                \Log::error(
+                    'SmartPings is enabled but client_id or secret_id is missing. Cannot proceed with verification.'
+                );
+                throw new InvalidArgumentException(
+                    'SmartPings verification is enabled but credentials are missing.' .
+                    ' Please configure SMARTPINGS_CLIENT_ID and SMARTPINGS_SECRET_ID environment variables.'
+                );
             }
         }
+    }
+
+    /** Whether the optional SDK is present. Overridden in tests. */
+    protected function sdkInstalled(): bool
+    {
+        return class_exists(SmartpingsService::class);
     }
 
     public function isEnabled(): bool
@@ -64,7 +86,7 @@ class SmartPingsVerificationService
             if (isset($responseData['success']) && $responseData['success'] === true) {
                 return [
                     'success' => true,
-                    'message' => $responseData['message'] ?? ucfirst($type).' verification sent successfully',
+                    'message' => $responseData['message'] ?? ucfirst($type) . ' verification sent successfully',
                 ];
             }
 
@@ -111,14 +133,14 @@ class SmartPingsVerificationService
 
             return isset($responseData['success']) && $responseData['success'] === true;
         } catch (\Exception $e) {
-            \Log::error('SmartPingsVerificationService: Exception during verification with provided code', [
+            Log::error('SmartPingsVerificationService: Exception during verification with provided code', [
                 'contact' => $contact,
                 'type' => $type,
                 'error' => $e->getMessage(),
             ]);
 
             // Fail securely - throw exception rather than silently returning false
-            throw new \RuntimeException('Verification service unavailable. Please try again later.', 503, $e);
+            throw new RuntimeException('Verification service unavailable. Please try again later.', 503, $e);
         }
     }
 
@@ -161,14 +183,14 @@ class SmartPingsVerificationService
                 return false;
             }
 
-            \Log::error('SmartPingsVerificationService: Exception during isVerified check', [
+            Log::error('SmartPingsVerificationService: Exception during isVerified check', [
                 'message' => $e->getMessage(),
                 'type' => $type,
                 'contact' => $contact,
             ]);
 
             // Fail securely - throw exception rather than silently returning false
-            throw new \RuntimeException('Verification service unavailable. Please try again later.', 503, $e);
+            throw new RuntimeException('Verification service unavailable. Please try again later.', 503, $e);
         }
     }
 }
