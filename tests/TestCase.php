@@ -5,9 +5,14 @@ namespace Whilesmart\UserAuthentication\Tests;
 use Faker\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\SanctumServiceProvider;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\SocialiteServiceProvider;
 use Orchestra\Testbench\Attributes\WithMigration;
+use Symfony\Component\Uid\Uuid;
+use Webauthn\CredentialRecord;
+use Webauthn\TrustPath\EmptyTrustPath;
+use Whilesmart\UserAuthentication\Models\Passkey;
 use Whilesmart\UserAuthentication\Models\User;
 
 use function Orchestra\Testbench\workbench_path;
@@ -31,6 +36,34 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
     }
 
     /**
+     * Helper to create a test passkey for a user.
+     */
+    protected function createPasskey(User $user, string $credentialId = 'dGVzdA'): Passkey
+    {
+        $unique = bin2hex(random_bytes(8));
+
+        $record = new CredentialRecord(
+            publicKeyCredentialId: 'test-id-' . $unique,
+            type: 'public-key',
+            transports: ['internal'],
+            attestationType: 'none',
+            trustPath: new EmptyTrustPath(),
+            aaguid: Uuid::fromString('00000000-0000-0000-0000-000000000000'),
+            credentialPublicKey: 'key',
+            userHandle: (string) $user->id,
+            counter: 0,
+        );
+
+        $data = Passkey::webAuthnSerializer()->serialize($record, 'json');
+
+        return $user->passkeys()->create([
+            'name' => 'Test Passkey',
+            'credential_id' => $credentialId . '-' . $unique,
+            'data' => $data,
+        ]);
+    }
+
+    /**
      * Define database migrations.
      */
     protected function defineDatabaseMigrations()
@@ -47,8 +80,20 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
     {
         return [
             \Whilesmart\UserAuthentication\UserAuthenticationServiceProvider::class,
+            SanctumServiceProvider::class,
             SocialiteServiceProvider::class,
         ];
+    }
+
+    /**
+     * Define environment setup.
+     */
+    protected function getEnvironmentSetUp($app)
+    {
+        $app['config']->set('auth.guards.sanctum', [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ]);
     }
 
     /**
