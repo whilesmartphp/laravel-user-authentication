@@ -101,16 +101,7 @@ The package supports WebAuthn passkeys for passwordless and email-based login. E
 
 If you use a custom user model, add the `Whilesmart\UserAuthentication\Traits\HasPasskeys` trait to it so the passkey polymorphic relation is available.
 
-```bash
-# .env
-USER_AUTH_PASSKEY_ALLOWED_ORIGINS=https://app.example.com
-USER_AUTH_PASSKEY_DOMAIN=https://app.example.com
-USER_AUTH_PASSKEY_RESIDENT_KEYS=true
-USER_AUTH_PASSKEY_ATTESTATIONS=none
-USER_AUTH_PASSKEY_SESSION_LIFETIME=5
-```
-
-`USER_AUTH_PASSKEY_DOMAIN` must include the scheme (e.g. `https://app.example.com`) because the backend extracts the RP ID host with `parse_url()`. A bare hostname will cause an **"rpId hash mismatch"** error.
+See the [Passkey Settings](#passkey-settings) section below for the available environment variables.
 
 **📖 [Passkey Guide](docs/passkey.md)**
 
