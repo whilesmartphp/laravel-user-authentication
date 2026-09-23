@@ -598,7 +598,7 @@ class UserAuthOpenApiDocs
     }
 
     #[OA\Delete(
-        path: '/passkeys/{passkey}',
+        path: '/passkeys/{id}',
         summary: 'Delete a passkey',
         security: [
             ['sanctum' => []],
@@ -606,7 +606,7 @@ class UserAuthOpenApiDocs
         tags: ['Passkey'],
         parameters: [
             new OA\Parameter(
-                name: 'passkey',
+                name: 'id',
                 description: 'Passkey ID',
                 in: 'path',
                 required: true,

@@ -94,11 +94,9 @@ class PasskeyController extends Controller
         if ($request->has('email')) {
             $User = config('user-authentication.user_model');
             $user = $User::where('email', $request->email)->first();
-            if (!$user) {
-                $response = $this->failure(__('Invalid credentials'));
-                return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN_OPTIONS);
+            if ($user) {
+                $userId = $user->id;
             }
-            $userId = $user->id;
         }
 
         $options = $this->passkeyService->getLoginOptions($userId);
@@ -159,7 +157,8 @@ class PasskeyController extends Controller
                 $userHandle
             );
         } catch (\Exception $e) {
-            $response = $this->failure($e->getMessage(), 400);
+            report($e);
+            $response = $this->failure(__('This passkey is not valid'), 400);
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
         }
 
@@ -218,7 +217,8 @@ class PasskeyController extends Controller
                 $request->getHost()
             );
         } catch (\Exception $e) {
-            $response = $this->failure($e->getMessage(), 400);
+            report($e);
+            $response = $this->failure(__('This passkey is not valid'), 400);
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
         }
 

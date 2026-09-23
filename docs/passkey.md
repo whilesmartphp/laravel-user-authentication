@@ -54,9 +54,10 @@ All passkey settings live under the `passkey` key in `config/user-authentication
 ```php
 'passkey' => [
     'session_lifetime' => env('USER_AUTH_PASSKEY_SESSION_LIFETIME', 5), // minutes
-    'domain' => env('USER_AUTH_PASSKEY_DOMAIN', 'localhost'),
+    'domain' => env('USER_AUTH_PASSKEY_DOMAIN', ''),
     'attestations' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_PASSKEY_ATTESTATIONS', 'none')), 'strlen'))),
     'allowed_origins' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_PASSKEY_ALLOWED_ORIGINS', '')), 'strlen'))),
+    'resident_keys' => env('USER_AUTH_PASSKEY_RESIDENT_KEYS', false),
 ],
 ```
 

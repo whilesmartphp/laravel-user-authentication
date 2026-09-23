@@ -5,8 +5,6 @@ namespace Whilesmart\UserAuthentication\Tests\Unit;
 use Symfony\Component\Uid\Uuid;
 use Webauthn\CredentialRecord;
 use Webauthn\TrustPath\EmptyTrustPath;
-use Whilesmart\UserAuthentication\Models\Passkey;
-use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Services\PasskeyService;
 use Whilesmart\UserAuthentication\Tests\TestCase;
 
@@ -87,26 +85,4 @@ class PasskeyServiceTest extends TestCase
         $this->assertSame('dGVzdC1pZA', $service->getCredentialId($record));
     }
 
-    private function createPasskey(User $user): Passkey
-    {
-        $record = new CredentialRecord(
-            publicKeyCredentialId: 'test-id',
-            type: 'public-key',
-            transports: ['internal'],
-            attestationType: 'none',
-            trustPath: new EmptyTrustPath(),
-            aaguid: Uuid::fromString('00000000-0000-0000-0000-000000000000'),
-            credentialPublicKey: 'key',
-            userHandle: (string) $user->id,
-            counter: 0,
-        );
-
-        $data = Passkey::webAuthnSerializer()->serialize($record, 'json');
-
-        return $user->passkeys()->create([
-            'name' => 'Test Passkey',
-            'credential_id' => 'dGVzdA-' . uniqid(),
-            'data' => $data,
-        ]);
-    }
 }

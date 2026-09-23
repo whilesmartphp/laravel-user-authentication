@@ -78,7 +78,7 @@ class PasskeyTest extends TestCase
             }
         });
 
-        $sessionId = 'reg_' . uniqid();
+        $sessionId = 'reg_' . bin2hex(random_bytes(8));
         Cache::put($sessionId, json_encode(['challenge' => 'test']), now()->addMinutes(5));
 
         $response = $this->postJson('/api/passkeys/register', [
@@ -137,14 +137,17 @@ class PasskeyTest extends TestCase
         $this->assertCount(1, $options['allowCredentials']);
     }
 
-    public function test_unknown_email_returns_user_not_found()
+    public function test_unknown_email_returns_empty_allow_credentials()
     {
         $response = $this->postJson('/api/passkeys/login/options', [
             'email' => 'missing@example.com',
         ]);
 
-        $response->assertStatus(400)
-            ->assertJsonPath('success', false);
+        $response->assertStatus(200)
+            ->assertJsonStructure(['success', 'data' => ['options', 'session_id']]);
+
+        $options = json_decode($response->json('data.options'), true);
+        $this->assertSame([], $options['allowCredentials']);
     }
 
     public function test_passwordless_login_options_return_empty_allow_credentials()
@@ -163,18 +166,19 @@ class PasskeyTest extends TestCase
         $user = $this->createUser();
         $passkey = $this->createPasskey($user);
 
-        $this->app->instance(PasskeyService::class, new class ($passkey) extends PasskeyService {
-            public function __construct(private Passkey $passkey)
-            {
-            }
+        $service = new class () extends PasskeyService {
+            public Passkey $passkey;
 
             public function verifyPasskey(array $passkey, string $options, string $host, ?string $userHandle = null): Passkey
             {
                 return $this->passkey;
             }
-        });
+        };
+        $service->passkey = $passkey;
 
-        $sessionId = 'log_' . uniqid();
+        $this->app->instance(PasskeyService::class, $service);
+
+        $sessionId = 'log_' . bin2hex(random_bytes(8));
         Cache::put($sessionId, json_encode([
             'options' => json_encode(['challenge' => 'test']),
             'userHandle' => (string) $user->id,
@@ -252,26 +256,4 @@ class PasskeyTest extends TestCase
         $response->assertStatus(404);
     }
 
-    private function createPasskey($user): Passkey
-    {
-        $record = new CredentialRecord(
-            publicKeyCredentialId: 'test-id-' . uniqid(),
-            type: 'public-key',
-            transports: ['internal'],
-            attestationType: 'none',
-            trustPath: new EmptyTrustPath(),
-            aaguid: Uuid::fromString('00000000-0000-0000-0000-000000000000'),
-            credentialPublicKey: 'key',
-            userHandle: (string) $user->id,
-            counter: 0,
-        );
-
-        $data = Passkey::webAuthnSerializer()->serialize($record, 'json');
-
-        return $user->passkeys()->create([
-            'name' => 'Test Passkey',
-            'credential_id' => 'dGVzdA-' . uniqid(),
-            'data' => $data,
-        ]);
-    }
 }
