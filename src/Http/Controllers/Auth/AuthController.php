@@ -483,8 +483,9 @@ class AuthController extends Controller
             return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
         }
 
-        $auth = Firebase::auth();
         try {
+            $auth = Firebase::auth();
+
             $verifiedIdToken = $auth->verifyIdToken($request->token);
             $uid = $verifiedIdToken->claims()->get('sub');
             $user = $auth->getUser($uid);
