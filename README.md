@@ -101,6 +101,8 @@ The package supports WebAuthn passkeys for passwordless and email-based login. E
 
 If you use a custom user model, add the `Whilesmart\UserAuthentication\Traits\HasPasskeys` trait to it so the passkey polymorphic relation is available.
 
+Registration and sign-in require authenticator user verification by default. Ceremony endpoints are rate limited per IP and email. Email options use 10 padded descriptors by default for all accounts, including unknown addresses. `USER_AUTH_PASSKEY_MAX_CREDENTIALS` controls both the descriptor count and the per-user registration cap. The RP domain accepts a bare hostname or URL, while allowed origins require full origins.
+
 See the [Passkey Settings](#passkey-settings) section below for the available environment variables.
 
 **📖 [Passkey Guide](docs/passkey.md)**
@@ -155,7 +157,7 @@ SMARTPINGS_SECRET_ID=your-secret-id
 # Full frontend origin(s) allowed to perform WebAuthn ceremonies
 USER_AUTH_PASSKEY_ALLOWED_ORIGINS=https://app.example.com
 
-# Relying party domain. Must include the scheme.
+# Relying party domain: bare hostname or URL.
 USER_AUTH_PASSKEY_DOMAIN=https://app.example.com
 
 # Attestation formats: none, packed, fido (default: none)
@@ -166,6 +168,10 @@ USER_AUTH_PASSKEY_SESSION_LIFETIME=5
 
 # Request discoverable (resident) credentials. Required for passwordless login without email.
 USER_AUTH_PASSKEY_RESIDENT_KEYS=false
+
+USER_AUTH_PASSKEY_USER_VERIFICATION=required
+USER_AUTH_PASSKEY_RATE_LIMIT_IP=30
+USER_AUTH_PASSKEY_RATE_LIMIT_EMAIL=10
 ```
 
 ## Available Endpoints

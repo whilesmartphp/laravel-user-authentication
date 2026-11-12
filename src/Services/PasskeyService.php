@@ -3,7 +3,10 @@
 namespace Whilesmart\UserAuthentication\Services;
 
 use Exception;
-use Illuminate\Support\Str;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use LogicException;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
 use Webauthn\AuthenticatorAssertionResponse;
 use Webauthn\AuthenticatorAssertionResponseValidator;
@@ -15,9 +18,11 @@ use Webauthn\CredentialRecord;
 use Webauthn\Exception\InvalidDataException;
 use Webauthn\PublicKeyCredential;
 use Webauthn\PublicKeyCredentialCreationOptions;
+use Webauthn\PublicKeyCredentialDescriptor;
 use Webauthn\PublicKeyCredentialRequestOptions;
 use Webauthn\PublicKeyCredentialRpEntity;
 use Webauthn\PublicKeyCredentialUserEntity;
+use Webauthn\SimpleFakeCredentialGenerator;
 use Whilesmart\UserAuthentication\Models\Passkey;
 use Whilesmart\UserAuthentication\Traits\Loggable;
 
@@ -25,24 +30,41 @@ class PasskeyService
 {
     use Loggable;
 
-    private function getRpId(): ?string
+    public function getRpId(): string
     {
         $domain = config('user-authentication.passkey.domain');
+        if (!is_string($domain) || $domain === '') {
+            throw new InvalidArgumentException('Passkey domain must be configured');
+        }
         $host = parse_url($domain, PHP_URL_HOST);
-        if ($host !== null) {
+        if (is_string($host) && $host !== '') {
             return $host;
         }
-        // If no scheme was provided, PHP's parse_url treats the value as a path.
-        // Prepend a scheme so it can be parsed as a host.
         $host = parse_url('https://' . $domain, PHP_URL_HOST);
+        if (!is_string($host) || $host === '') {
+            throw new InvalidArgumentException('Invalid passkey domain');
+        }
         return $host;
+    }
+
+    private function userVerification(): string
+    {
+        $policy = config('user-authentication.passkey.user_verification');
+        if (!in_array($policy, ['required', 'preferred', 'discouraged'], true)) {
+            throw new InvalidArgumentException('Invalid passkey user verification policy');
+        }
+        return $policy;
     }
 
     /**
      * @throws InvalidDataException
      */
-    public function getLoginOptions(int|string|null $userId = null): PublicKeyCredentialRequestOptions
-    {
+    public function getLoginOptions(
+        int|string|null $userId = null,
+        ?string $email = null,
+        ?Request $request = null
+    ): PublicKeyCredentialRequestOptions {
+        $user = null;
         if ($userId !== null) {
             $User = config('user-authentication.user_model');
             $user = $User::find($userId);
@@ -54,10 +76,30 @@ class PasskeyService
                 : [];
         }
 
+        if ($email !== null) {
+            $key = config('app.key');
+            if (!is_string($key) || $key === '') {
+                throw new LogicException('An application key is required for passkey login');
+            }
+            $generator = new SimpleFakeCredentialGenerator(secret: hash_hmac('sha256', 'passkey-options', $key));
+            $allowedCredentials = array_map(
+                fn ($credential) => new PublicKeyCredentialDescriptor('public-key', $credential->id),
+                $allowedCredentials ?? []
+            );
+            $credentialCount = count($allowedCredentials);
+            for ($index = 0; $index < config('user-authentication.passkey.max_credentials', 10); $index++) {
+                $fake = $generator->generate($request ?? new Request(), $email . ':' . $index)[0];
+                if ($index >= $credentialCount) {
+                    $allowedCredentials[] = new PublicKeyCredentialDescriptor('public-key', $fake->id);
+                }
+            }
+        }
+
         return new PublicKeyCredentialRequestOptions(
-            challenge: Str::random(),
+            challenge: random_bytes(32),
             rpId: $this->getRpId(),
             allowCredentials: $allowedCredentials ?? [],
+            userVerification: $this->userVerification(),
         );
     }
 
@@ -79,12 +121,12 @@ class PasskeyService
                 id: $userId,
                 displayName: $displayName,
             ),
-            challenge: Str::random(),
+            challenge: random_bytes(32),
             authenticatorSelection: new AuthenticatorSelectionCriteria(
                 residentKey: config('user-authentication.passkey.resident_keys')
                     ? AuthenticatorSelectionCriteria::RESIDENT_KEY_REQUIREMENT_REQUIRED
                     : AuthenticatorSelectionCriteria::RESIDENT_KEY_REQUIREMENT_NO_PREFERENCE,
-                userVerification: AuthenticatorSelectionCriteria::USER_VERIFICATION_REQUIREMENT_PREFERRED,
+                userVerification: $this->userVerification(),
             ),
         );
     }
@@ -92,7 +134,7 @@ class PasskeyService
     /**
      * @throws ExceptionInterface
      */
-    public function verifyPasskey(array $passkey, string $options, string $host, ?string $userHandle = null): Passkey
+    public function verifyPasskey(array $passkey, string $options, ?string $userHandle = null): Passkey
     {
         $publicKeyCredential = Passkey::webAuthnSerializer()->deserialize(
             json_encode($passkey),
@@ -109,41 +151,42 @@ class PasskeyService
             throw new Exception(__('This passkey is not valid'), 400);
         }
 
-        $validatedPasskey = Passkey::firstWhere('credential_id', $this->base64urlEncode($publicKeyCredential->rawId));
+        return DB::transaction(function () use ($publicKeyCredential, $publicKeyCredentialOptions, $userHandle) {
+            $validatedPasskey = Passkey::where('credential_id', $this->base64urlEncode($publicKeyCredential->rawId))
+                ->lockForUpdate()->first();
 
-        if (!$validatedPasskey) {
-            throw new Exception(__('This passkey is not valid'), 400);
-        }
+            if (!$validatedPasskey) {
+                throw new Exception(__('This passkey is not valid'), 400);
+            }
 
-        try {
-            $csmFactory = new CeremonyStepManagerFactory();
-            $csmFactory->setAllowedOrigins(config('user-authentication.passkey.allowed_origins'));
-            $csmFactory->setAttestationStatementSupportManager(Passkey::attestationStatementSupportManager());
-            $publicKeyCredentialSource = AuthenticatorAssertionResponseValidator::create(
-                $csmFactory->requestCeremony()
-            )->check(
-                credentialRecord: $validatedPasskey->getCredential(),
-                authenticatorAssertionResponse: $publicKeyCredential->response,
-                publicKeyCredentialRequestOptions: $publicKeyCredentialOptions,
-                host: $host,
-                userHandle: $userHandle,
-            );
-        } catch (\Throwable $e) {
-            $this->error($e->getMessage());
-            throw new Exception($e->getMessage(), 400);
-        }
+            try {
+                $csmFactory = new CeremonyStepManagerFactory();
+                $csmFactory->setAllowedOrigins(config('user-authentication.passkey.allowed_origins'));
+                $csmFactory->setAttestationStatementSupportManager(Passkey::attestationStatementSupportManager());
+                $publicKeyCredentialSource = AuthenticatorAssertionResponseValidator::create(
+                    $csmFactory->requestCeremony()
+                )->check(
+                    credentialRecord: $validatedPasskey->getCredential(),
+                    authenticatorAssertionResponse: $publicKeyCredential->response,
+                    publicKeyCredentialRequestOptions: $publicKeyCredentialOptions,
+                    host: $this->getRpId(),
+                    userHandle: $userHandle,
+                );
+            } catch (\Throwable $e) {
+                $this->error($e->getMessage());
+                throw new Exception($e->getMessage(), 400);
+            }
 
-        $validatedPasskey->update(['data' => Passkey::webAuthnSerializer()
-            ->serialize($publicKeyCredentialSource, 'json')]);
-        return $validatedPasskey;
+            $validatedPasskey->update(['data' => Passkey::webAuthnSerializer()
+                ->serialize($publicKeyCredentialSource, 'json')]);
+            return $validatedPasskey;
+        });
     }
 
     private function base64urlEncode(string $data): string
     {
-        // 1. Run standard base64
         $b64 = base64_encode($data);
 
-        // 2. Replace + with -, / with _, and remove = padding
         return rtrim(strtr($b64, '+/', '-_'), '=');
     }
 
@@ -152,7 +195,7 @@ class PasskeyService
      * @throws \Throwable
      * @throws Exception
      */
-    public function getPublicKeyCredentialSource(array $passkey, string $options, $host): CredentialRecord
+    public function getPublicKeyCredentialSource(array $passkey, string $options): CredentialRecord
     {
 
         $publicKeyCredential = Passkey::webAuthnSerializer()->deserialize(
@@ -182,7 +225,7 @@ class PasskeyService
             )->check(
                 authenticatorAttestationResponse: $publicKeyCredential->response,
                 publicKeyCredentialCreationOptions: $publicKeyCredentialOptions,
-                host: $host,
+                host: $this->getRpId(),
             );
         } catch (\Throwable $e) {
             $this->error($e->getMessage());

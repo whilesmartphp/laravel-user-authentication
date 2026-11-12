@@ -1,6 +1,6 @@
 # Passkey Authentication
 
-This package supports WebAuthn passkeys for passwordless and second-factor authentication. Passkeys are discoverable credentials that let users sign in with a biometric sensor, PIN, or security key.
+This package supports WebAuthn passkeys for passwordless and standalone sign-in. Passkeys are discoverable credentials that let users sign in with a biometric sensor, PIN, or security key.
 
 ## Table of Contents
 
@@ -36,9 +36,9 @@ class User extends Authenticatable
 
 Key features:
 
-- **Configurable resident credentials** — opt-in to discoverable credentials for true passwordless login, or keep them off for second-factor-only use.
-- **Email-based passkey login** — the backend filters the allowed credentials to those belonging to a specific user.
-- **Passwordless passkey login** — when resident keys are enabled, the backend returns an empty `allowCredentials` list, letting the browser show the passkey picker.
+- **Configurable resident credentials**: opt-in to discoverable credentials for true passwordless login, or keep them off for second-factor-only use.
+- **Email-based passkey login**: the backend filters the allowed credentials to those belonging to a specific user.
+- **Passwordless passkey login**: when resident keys are enabled, the backend returns an empty `allowCredentials` list, letting the browser show the passkey picker.
 
 ## Requirements
 
@@ -53,11 +53,17 @@ All passkey settings live under the `passkey` key in `config/user-authentication
 
 ```php
 'passkey' => [
+    'max_credentials' => (int) env('USER_AUTH_PASSKEY_MAX_CREDENTIALS', 10),
     'session_lifetime' => env('USER_AUTH_PASSKEY_SESSION_LIFETIME', 5), // minutes
     'domain' => env('USER_AUTH_PASSKEY_DOMAIN', ''),
     'attestations' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_PASSKEY_ATTESTATIONS', 'none')), 'strlen'))),
     'allowed_origins' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_PASSKEY_ALLOWED_ORIGINS', '')), 'strlen'))),
     'resident_keys' => env('USER_AUTH_PASSKEY_RESIDENT_KEYS', false),
+    'user_verification' => env('USER_AUTH_PASSKEY_USER_VERIFICATION', 'required'),
+    'rate_limits' => [
+        'ip' => env('USER_AUTH_PASSKEY_RATE_LIMIT_IP', 30),
+        'email' => env('USER_AUTH_PASSKEY_RATE_LIMIT_EMAIL', 10),
+    ],
 ],
 ```
 
@@ -65,25 +71,16 @@ All passkey settings live under the `passkey` key in `config/user-authentication
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
+| `USER_AUTH_PASSKEY_MAX_CREDENTIALS` | `10` | Email login descriptor padding count and maximum passkeys per user. |
 | `USER_AUTH_PASSKEY_SESSION_LIFETIME` | `5` | How many minutes the server-side registration/login challenge is cached. |
-| `USER_AUTH_PASSKEY_DOMAIN` | (empty) | The relying party ID (RP ID) host. Must include the scheme, e.g. `https://app.example.com`. |
+| `USER_AUTH_PASSKEY_DOMAIN` | (empty) | The relying party ID (RP ID) host. Accepts `app.example.com` or `https://app.example.com`. |
 | `USER_AUTH_PASSKEY_ALLOWED_ORIGINS` | (empty) | Full origins (scheme + host + port) allowed to perform WebAuthn ceremonies. Required for HTTPS deployments. |
 | `USER_AUTH_PASSKEY_ATTESTATIONS` | `none` | Comma-separated attestation formats. Options: `none`, `packed`, `fido`. |
 | `USER_AUTH_PASSKEY_RESIDENT_KEYS` | `false` | Request discoverable (resident) credentials. Required for passwordless login without email. |
 
-### Important: include the scheme in `USER_AUTH_PASSKEY_DOMAIN`
+### RP ID configuration
 
-The backend extracts the RP ID host with PHP's `parse_url()`. If you provide a bare hostname such as `app.example.com`, `parse_url()` returns `null` for the host and the `rp.id` is dropped from the registration options. The browser then falls back to the origin's effective domain, while the server verification may use a different host, causing an **"rpId hash mismatch"** error.
-
-Always set the domain with a scheme:
-
-```bash
-# Good
-USER_AUTH_PASSKEY_DOMAIN=https://app.example.com
-
-# Bad — will drop rp.id
-USER_AUTH_PASSKEY_DOMAIN=app.example.com
-```
+`USER_AUTH_PASSKEY_DOMAIN` accepts a bare hostname (`app.example.com`) or a URL (`https://app.example.com`). The backend extracts the hostname in either case. Allowed origins must include the scheme and any non-default port.
 
 For local HTTPS tunnels such as ngrok, set both the frontend origin and domain to the ngrok URL:
 
@@ -125,7 +122,7 @@ Response:
   "status": "success",
   "data": {
     "options": "{\"challenge\":\"...\",\"rp\":{\"name\":\"Laravel\",\"id\":\"app.example.com\"},\"user\":{...},...}",
-    "session_id": "reg_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    "session_id": "550e8400-e29b-41d4-a716-446655440000"
   }
 }
 ```
@@ -151,7 +148,7 @@ curl -X POST https://app.example.com/api/passkeys/register \
   -H "Authorization: Bearer {token}" \
   -H "Content-Type: application/json" \
   -d '{
-    "session_id": "reg_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "MacBook Touch ID",
     "passkey": {
       "id": "...",
@@ -196,7 +193,7 @@ const credential = await navigator.credentials.get({ publicKey });
 curl -X POST https://app.example.com/api/passkeys/login \
   -H "Content-Type: application/json" \
   -d '{
-    "session_id": "log_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
     "passkey": {
       "id": "...",
       "rawId": "...",
@@ -246,9 +243,9 @@ The rest of the flow is identical to the email-based flow.
 
 The key pieces of a passkey frontend implementation are:
 
-1. **Convert server options to WebAuthn format** — base64url strings must become `ArrayBuffer`s.
-2. **Convert the browser credential back to JSON** — binary fields become base64url strings.
-3. **Call the API** — send requests to the route prefix configured in the package (default `/api`).
+1. **Convert server options to WebAuthn format**: base64url strings must become `ArrayBuffer`s.
+2. **Convert the browser credential back to JSON**: binary fields become base64url strings.
+3. **Call the API**: send requests to the route prefix configured in the package (default `/api`).
 
 ### Base64url helpers
 
@@ -273,8 +270,8 @@ function arrayBufferToBase64url(buf) {
 
 WebAuthn is strict about the relationship between the frontend origin and the RP ID.
 
-- **Origin** — the scheme + host + port where the JavaScript runs (`https://app.example.com`).
-- **RP ID** — the host component extracted from `USER_AUTH_PASSKEY_DOMAIN` (`app.example.com`).
+- **Origin**: the scheme + host + port where the JavaScript runs (`https://app.example.com`).
+- **RP ID**: the host component extracted from `USER_AUTH_PASSKEY_DOMAIN` (`app.example.com`).
 
 The browser requires the origin's host to match or be a registrable domain suffix of the RP ID. The server verifies the same relationship through `allowed_origins`.
 
@@ -299,29 +296,19 @@ USER_AUTH_PASSKEY_ALLOWED_ORIGINS=https://app.example.com
 USER_AUTH_PASSKEY_DOMAIN=https://app.example.com
 ```
 
-#### Bare hostname bug
-
-If you set only the bare hostname:
-
-```bash
-USER_AUTH_PASSKEY_DOMAIN=app.example.com
-```
-
-the backend extracts `null` as the RP ID and the registration options omit `rp.id`. The browser then uses the origin host (`app.example.com`) while the server verification may use the request host, producing an **"rpId hash mismatch"** error.
-
 ## Security Considerations
 
-- **HTTPS in production** — WebAuthn requires a secure origin in all modern browsers.
-- **Allowed origins** — restrict `USER_AUTH_PASSKEY_ALLOWED_ORIGINS` to your actual frontend origins. Do not use wildcard origins.
-- **RP ID scope** — choosing a broad RP ID (e.g., `example.com`) makes the passkey usable across all subdomains. Choose the narrowest RP ID that fits your architecture.
-- **Resident keys** — when `USER_AUTH_PASSKEY_RESIDENT_KEYS=true`, the package requests discoverable credentials (`residentKey: required`). This stores user-identifying information on the authenticator; ensure this aligns with your privacy policy.
-- **Session lifetime** — the challenge cache is short (5 minutes by default). Do not increase it significantly.
+- **HTTPS in production**: WebAuthn requires a secure origin in all modern browsers.
+- **Allowed origins**: restrict `USER_AUTH_PASSKEY_ALLOWED_ORIGINS` to your actual frontend origins. Do not use wildcard origins.
+- **RP ID scope**: choosing a broad RP ID (e.g., `example.com`) makes the passkey usable across all subdomains. Choose the narrowest RP ID that fits your architecture.
+- **Resident keys**: when `USER_AUTH_PASSKEY_RESIDENT_KEYS=true`, the package requests discoverable credentials (`residentKey: required`). This stores user-identifying information on the authenticator; ensure this aligns with your privacy policy.
+- **Session lifetime**: the challenge cache is short (5 minutes by default). Do not increase it significantly.
 
 ## Troubleshooting
 
 ### "rpId hash mismatch"
 
-- `USER_AUTH_PASSKEY_DOMAIN` is missing the scheme. Use `https://app.example.com`, not `app.example.com`.
+- `USER_AUTH_PASSKEY_DOMAIN` does not match the frontend RP ID. Bare hostnames and URLs are both supported.
 - The frontend origin does not match the configured RP ID or allowed origins.
 - You are opening the frontend through a different URL than the one configured (e.g., `localhost:5173` instead of the ngrok URL).
 
@@ -341,3 +328,13 @@ the backend extracts `null` as the RP ID and the registration options omit `rp.i
 - `USER_AUTH_PASSKEY_RESIDENT_KEYS` is not set to `true`. Passwordless login requires discoverable credentials.
 - The passkey was not created as a discoverable credential. The package requests `residentKey: required` when resident keys are enabled, but the authenticator may ignore this if it does not support resident keys.
 - The browser has no discoverable credentials for the RP ID.
+
+## Verification and abuse protection
+
+User verification (biometric or authenticator PIN) is required for registration and standalone sign-in by default. `USER_AUTH_PASSKEY_USER_VERIFICATION` accepts `required`, `preferred`, or `discouraged`. Lowering this policy removes the requirement that the authenticator verify its user.
+
+All four ceremony endpoints have separate named rate limiters. `USER_AUTH_PASSKEY_RATE_LIMIT_IP` defaults to 30 requests per minute per IP per endpoint; `USER_AUTH_PASSKEY_RATE_LIMIT_EMAIL` defaults to 10 per email per endpoint when an email is provided (or the authenticated user's email for registration). Exceeding either returns HTTP 429. Configure trusted proxies correctly so client IP limits are effective.
+
+Email login options contain `USER_AUTH_PASSKEY_MAX_CREDENTIALS` credential descriptors (default: 10), padded with stable fake IDs derived from the email and application key. Unknown addresses and users without passkeys receive the same response shape and count. Transport hints are omitted for all descriptors. The same setting caps the number of passkeys each user can register. Passwordless options without email retain an empty allow list. Set a non-empty `app.key`; changing it changes fake IDs.
+
+Sessions are UUIDs, scoped to registration or login, expire after the configured lifetime, and are consumed once even when validation fails. Registration sessions belong to the authenticated user who requested them. Use a shared Redis or database cache across workers, with Laravel's cache lock table installed for the database store. Assertion verification and counter persistence hold a database row lock within one transaction.

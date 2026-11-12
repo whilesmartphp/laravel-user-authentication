@@ -51,6 +51,12 @@ return [
     ],
 
     'passkey' => [
+        'max_credentials' => (int) env('USER_AUTH_PASSKEY_MAX_CREDENTIALS', 10),
+        'user_verification' => env('USER_AUTH_PASSKEY_USER_VERIFICATION', 'required'),
+        'rate_limits' => [
+            'ip' => env('USER_AUTH_PASSKEY_RATE_LIMIT_IP', 30),
+            'email' => env('USER_AUTH_PASSKEY_RATE_LIMIT_EMAIL', 10),
+        ],
         'session_lifetime' => env('USER_AUTH_PASSKEY_SESSION_LIFETIME', 5), // in minutes
         'domain' => env('USER_AUTH_PASSKEY_DOMAIN', ''),
         'attestations' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_PASSKEY_ATTESTATIONS', 'none')), 'strlen'))), // none,packed, fido
