@@ -3,150 +3,209 @@
 namespace Whilesmart\UserAuthentication\Services;
 
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
-use Whilesmart\UserAuthentication\Models\MagicLink;
-use Whilesmart\UserAuthentication\Models\VerificationCode;
+use Whilesmart\UserAuthentication\Models\TwoFactorAuth;
+use Whilesmart\UserAuthentication\Models\TwoFactorChallenge;
+use Whilesmart\UserAuthentication\Models\User;
 
 class TwoFactorService
 {
     /**
-     * Handle the 2FA challenge flow (sending codes or magic links).
+     * @param User $user
      */
-    public function handleChallenge(
-        $user,
-        string $type,
-        string $contact,
-        string $purpose = 'login',
-        bool $sendMagicLink = true
-    ): void {
-        $smartPings = app(SmartPingsVerificationService::class);
-
-        if ($type === 'totp') {
-            // TOTP is handled by the device app, no code or magic link needs to be sent.
-            return;
-        }
-
-        if ($smartPings->isEnabled()) {
-            $smartPings->sendVerification($contact, $type);
-
-            return;
-        }
-
-        // Default: Generate and send our own code/link
-        $this->sendSelfManagedChallenge($user, $type, $contact, $purpose, $sendMagicLink);
+    public function userData($user): array
+    {
+        return $user->only(['id', 'first_name', 'last_name', 'username', 'email', 'phone', 'email_verified_at']);
     }
 
     /**
-     * Consolidate verification logic (Review Point 7)
+     * @param TwoFactorAuth $factor
      */
-    public function verifyCode(string $contact, string $code, string $type, string $purpose = 'login'): bool
+    public function policy($factor): string
     {
-        $smartPings = app(SmartPingsVerificationService::class);
-
-        if ($smartPings->isEnabled()) {
-            return $smartPings->verify($contact, $code, $type);
-        }
-
-        $codeEntry = VerificationCode::where('contact', $contact)
-            ->where('purpose', "{$purpose}_{$type}")
-            ->first();
-
-        if (!$codeEntry || $codeEntry->isExpired()) {
-            return false;
-        }
-
-        if (!Hash::check($code, $codeEntry->code)) {
-            return false;
-        }
-
-        // Invalidate the code immediately to prevent replay attacks.
-        $codeEntry->delete();
-
-        return true;
-    }
-
-    /**
-     * Create a short-lived, server-verifiable pending-2FA token.
-     */
-    public function generatePendingToken($user, string $contact, string $type): string
-    {
-        $expiryMinutes = config('user-authentication.verification.code_expiry_minutes', 5);
-
-        return Crypt::encryptString(json_encode([
-            'user_id' => $user->id,
-            'contact' => $contact,
-            'type' => $type,
-            'expires_at' => now()->addMinutes($expiryMinutes)->toDateTimeString(),
+        return hash('sha256', json_encode([
+            $factor->id, $factor->type, $factor->is_enabled, $factor->policy_version,
+            $factor->getRawOriginal('secret'), $factor->confirmed_at?->toISOString(),
         ]));
     }
 
     /**
-     * Decode and validate a pending-2FA token.
-     *
-     * @return array<string, mixed>|null
+     * @param User $user
      */
-    public function decodePendingToken(string $token): ?array
+    public function issue($user, string $purpose = 'login', HookAction $action = HookAction::LOGIN): ?array
+    {
+        return DB::transaction(function () use ($user, $purpose, $action) {
+            $factor = $user->twoFactorAuth()->lockForUpdate()->first();
+            if (! $factor || ! $factor->is_enabled) {
+                return null;
+            }
+            $contact = $factor->type === 'phone' ? $user->phone : $user->email;
+            $id = Str::random(64);
+            $token = Crypt::encryptString(json_encode([
+                'id' => $id, 'purpose' => $purpose, 'method' => $factor->type,
+            ]));
+            TwoFactorChallenge::where('factor_id', $factor->id)->delete();
+            $challenge = TwoFactorChallenge::create([
+                'id' => $id,
+                'factor_id' => $factor->id,
+                'token_hash' => hash('sha256', $token),
+                'purpose' => $purpose,
+                'method' => $factor->type,
+                'contact' => $contact,
+                'policy' => $this->policy($factor),
+                'action' => $action->value,
+                'attempts' => 0,
+                'expires_at' => now()->addMinutes(config('user-authentication.two_factor.expiry_minutes', 5)),
+            ]);
+            if (in_array($factor->type, ['email', 'phone'], true)) {
+                $length = max(4, min(8, (int) config('user-authentication.verification.code_length', 6)));
+                $code = str_pad((string) random_int(0, 10 ** $length - 1), $length, '0', STR_PAD_LEFT);
+                $link = $purpose === 'login' && config('user-authentication.magic_link.url') ? Str::random(64) : null;
+                $challenge->update([
+                    'code_hash' => Hash::make($code),
+                    'link_hash' => $link ? hash('sha256', $link) : null,
+                ]);
+                $url = $link ? rtrim(config('user-authentication.magic_link.url'), '/')
+                    . '?' . http_build_query(['token' => $link, 'two_factor_token' => $token]) : null;
+                VerificationCodeGeneratedEvent::dispatch(
+                    $contact,
+                    $code,
+                    $purpose . '_' . $factor->type,
+                    $factor->type,
+                    $url
+                );
+            }
+
+            return ['two_factor_required' => true, 'method' => $factor->type, 'two_factor_token' => $token];
+        });
+    }
+
+    public function challenge(string $token): ?TwoFactorChallenge
     {
         try {
             $payload = json_decode(Crypt::decryptString($token), true);
-
-            if (! is_array($payload) || empty($payload['expires_at'])) {
+            if (! is_array($payload) || ! isset($payload['id'], $payload['purpose'], $payload['method'])) {
                 return null;
             }
 
-            if (now()->greaterThan($payload['expires_at'])) {
-                return null;
-            }
-
-            return $payload;
+            return TwoFactorChallenge::whereKey($payload['id'])
+                ->where('token_hash', hash('sha256', $token))
+                ->where('purpose', $payload['purpose'])
+                ->where('method', $payload['method'])
+                ->whereNull('consumed_at')
+                ->where('expires_at', '>', now())->first();
         } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
             return null;
         }
     }
 
+    public function accountKey(string $token): string
+    {
+        $challenge = $this->challenge($token);
+        $factor = $challenge ? TwoFactorAuth::whereKey($challenge->factor_id)->first() : null;
+
+        return $factor ? hash('sha256', $factor->authenticatable_type . ':' . $factor->authenticatable_id)
+            : hash('sha256', $token);
+    }
+
     /**
-     * Generate code and magic link, persist them, and dispatch the event.
+     * @param User $user
+     * @param TwoFactorAuth $factor
+     * @param TwoFactorChallenge $challenge
      */
-    protected function sendSelfManagedChallenge(
-        $user,
-        string $type,
-        string $contact,
-        string $purpose = 'login',
-        bool $sendMagicLink = true
-    ): void {
-        // 1. Generate the numeric code
-        $codeLength = config('user-authentication.verification.code_length', 6);
-        $code = str_pad((string)random_int(0, pow(10, $codeLength) - 1), $codeLength, '0', STR_PAD_LEFT);
+    public function current($user, $factor, $challenge): bool
+    {
+        $contact = $factor->type === 'phone' ? $user->phone : $user->email;
 
-        $expiry = config('user-authentication.verification.code_expiry_minutes', 5);
+        return $factor->is_enabled && $challenge->policy === $this->policy($factor)
+            && $challenge->method === $factor->type && $challenge->contact === $contact;
+    }
 
-        // 2. Persist the numeric code
-        VerificationCode::updateOrCreate(
-            ['contact' => $contact, 'purpose' => "{$purpose}_{$type}"],
-            [
-                'code' => Hash::make($code),
-                'expires_at' => now()->addMinutes($expiry),
-            ]
-        );
+    /**
+     * @param TwoFactorAuth $factor
+     */
+    public function verifyFactor($factor, string $code): bool
+    {
+        foreach ($factor->recovery_codes ?? [] as $index => $recovery) {
+            if (hash_equals($recovery, $code)) {
+                $codes = $factor->recovery_codes;
+                unset($codes[$index]);
+                $factor->update(['recovery_codes' => array_values($codes)]);
 
-        $magicLinkUrl = null;
-
-        // 3. Generate a magic link token, store its hash, and build the URL
-        if ($sendMagicLink) {
-            $rawToken = Str::random(64);
-            MagicLink::create([
-                'user_id' => $user->id,
-                'token' => hash('sha256', $rawToken),
-                'expires_at' => now()->addMinutes(config('user-authentication.magic_link.expiry_minutes', 15)),
-            ]);
-
-            $magicLinkUrl = rtrim(config('user-authentication.magic_link.url'), '/')
-                . '?' . http_build_query(['token' => $rawToken]);
+                return true;
+            }
         }
+        if ($factor->type !== 'totp' || ! preg_match('/\A[0-9]{6}\z/', $code)) {
+            return false;
+        }
+        $step = app('pragmarx.google2fa')->verifyKeyNewer($factor->secret, $code, $factor->last_used_step ?? 0);
+        if ($step === false) {
+            return false;
+        }
+        $factor->update(['last_used_step' => $step]);
 
-        // 4. Dispatch Event (Addressing Review Point 4: Code is no longer null)
-        VerificationCodeGeneratedEvent::dispatch($contact, $code, "{$purpose}_{$type}", $type, $magicLinkUrl);
+        return true;
+    }
+
+    /**
+     * @param User $user
+     */
+    public function consume($user, string $token, string $code, string $purpose = 'login', bool $link = false): ?string
+    {
+        return DB::transaction(function () use ($user, $token, $code, $purpose, $link) {
+            $factor = $user->twoFactorAuth()->lockForUpdate()->first();
+            $found = $this->challenge($token);
+            if (! $factor || ! $found) {
+                return null;
+            }
+            $challenge = TwoFactorChallenge::whereKey($found->id)->lockForUpdate()->first();
+            if (
+                ! $challenge || $challenge->consumed_at || $challenge->factor_id !== $factor->id
+                || $challenge->purpose !== $purpose || ! $this->current($user, $factor, $challenge)
+            ) {
+                return null;
+            }
+            $budget = max(1, (int) config('user-authentication.two_factor.attempts', 5));
+            if ($challenge->attempts >= $budget) {
+                $challenge->delete();
+
+                return null;
+            }
+            $challenge->increment('attempts');
+            if ($link) {
+                $valid = $purpose === 'login' && in_array($factor->type, ['email', 'phone'], true)
+                    && $challenge->link_hash && hash_equals($challenge->link_hash, hash('sha256', $code));
+            } else {
+                $valid = $this->verifyFactor($factor, $code);
+                if (! $valid && in_array($factor->type, ['email', 'phone'], true)) {
+                    $valid = $challenge->code_hash && Hash::check($code, $challenge->code_hash);
+                }
+            }
+            if (! $valid) {
+                if ($challenge->attempts >= $budget) {
+                    $challenge->delete();
+                }
+
+                return null;
+            }
+            // A successful hash check alone cannot authorize concurrent consumers.
+            $consumed = TwoFactorChallenge::whereKey($challenge->id)
+                ->whereNull('consumed_at')->where('attempts', $challenge->attempts)
+                ->where('expires_at', '>', now())
+                ->update(['consumed_at' => now(), 'code_hash' => null, 'link_hash' => null]);
+            if ($consumed !== 1) {
+                return null;
+            }
+            if ($purpose === 'disable_2fa') {
+                $factor->delete();
+                $user->tokens()->delete();
+            }
+
+            return $challenge->action;
+        });
     }
 }

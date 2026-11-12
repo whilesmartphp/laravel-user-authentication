@@ -5,6 +5,7 @@ namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
@@ -115,7 +116,7 @@ class AuthController extends Controller
             $this->info("New user with email $request->email just registered ");
 
             $response = [
-                'user' => $user,
+                'user' => app(TwoFactorService::class)->userData($user),
                 'token' => $user->createToken('auth-token')->plainTextToken,
             ];
 
@@ -167,34 +168,7 @@ class AuthController extends Controller
                 return $this->runAfterHooks($request, $response, HookAction::LOGIN);
             }
 
-            // FORCE reload the user from the database using package model
-            $UserModel = config('user-authentication.user_model', \Whilesmart\UserAuthentication\Models\User::class);
-            $user = $UserModel::find($user->id);
-
-            if ($user->hasTwoFactorEnabled()) {
-                $type = $user->twoFactorAuth->type ?? 'totp';
-                $contact = ($type === 'phone') ? $user->phone : $user->email;
-                $twoFactorService = app(TwoFactorService::class);
-
-                // Call the Service
-                $twoFactorService->handleChallenge($user, $type, $contact);
-
-                return $this->success([
-                    'two_factor_required' => true,
-                    'method' => $type,
-                    'two_factor_token' => $twoFactorService->generatePendingToken($user, $contact, $type),
-                ], 'Two-factor authentication required.', 200);
-            }
-
-            UserLoggedInEvent::dispatch($user);
-
-            $response = $this->success([
-                'token' => $user->createToken('auth-token')->plainTextToken,
-                'token_type' => 'Bearer',
-                'user' => $user,
-            ], 'User successfully logged in', 200);
-
-            return $this->runAfterHooks($request, $response, HookAction::LOGIN);
+            return $this->signIn($request, $user, HookAction::LOGIN);
         } catch (\Exception $e) {
             $this->error('An error occurred during login: ' . $e->getMessage(), ['exception' => $e]);
 
@@ -296,14 +270,7 @@ class AuthController extends Controller
 
         OauthUserAuthenticatedEvent::dispatch($existing_user, $social_user, $driver, $isNewUser);
 
-        $response = [
-            'user' => $existing_user,
-            'token' => $existing_user->createToken('auth-token')->plainTextToken,
-        ];
-
-        $response = $this->success($response, 'User authenticated successfully', 201);
-
-        return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+        return $this->signIn($request, $existing_user, HookAction::OAUTH_CALLBACK, 201);
     }
 
     public function sendVerificationCode(Request $request): JsonResponse
@@ -493,6 +460,7 @@ class AuthController extends Controller
 
     public function firebaseAuthCallback(Request $request, string $driver)
     {
+        $request = $this->runBeforeHooks($request, HookAction::OAUTH_CALLBACK);
         $driver = strtolower($driver);
         $rules = ['token' => 'required|string'];
 
@@ -536,14 +504,7 @@ class AuthController extends Controller
 
             OauthUserAuthenticatedEvent::dispatch($existing_user, null, $driver, $isNewUser);
 
-            $response = [
-                'user' => $existing_user,
-                'token' => $existing_user->createToken('auth-token')->plainTextToken,
-            ];
-
-            $response = $this->success($response, 'User authenticated successfully', 200);
-
-            return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+            return $this->signIn($request, $existing_user, HookAction::OAUTH_CALLBACK);
         } catch (FailedToVerifyToken $e) {
             $this->error($e->getMessage());
             $response = $this->failure('Invalid token', 400);
@@ -558,6 +519,33 @@ class AuthController extends Controller
     }
 
     /**
+     * @param User $user
+     */
+    private function signIn(Request $request, $user, HookAction $action, int $status = 200): JsonResponse
+    {
+        return DB::transaction(function () use ($request, $user, $action, $status) {
+            $user = $user->newQuery()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $service = app(TwoFactorService::class);
+            if ($user->hasTwoFactorEnabled()) {
+                $pending = $service->issue($user, 'login', $action);
+                if ($pending === null) {
+                    return $this->failure('Two-factor policy changed.', 409);
+                }
+
+                return $this->success($pending, 'Two-factor authentication required.');
+            }
+            UserLoggedInEvent::dispatch($user);
+            $response = $this->success([
+                'token' => $user->createToken('auth-token')->plainTextToken,
+                'token_type' => 'Bearer',
+                'user' => $service->userData($user),
+            ], 'User successfully logged in', $status);
+
+            return $this->runAfterHooks($request, $response, $action);
+        });
+    }
+
+    /**
      * @return array{0: mixed, 1: bool} The authenticated user instance and whether it's a new user.
      */
     private function handleUserAuthentication(string $email, string $name, string $driver, array $oauthData = []): array
@@ -566,10 +554,7 @@ class AuthController extends Controller
         $existing_user = $User::where('email', $email)->first();
         $isNewUser = false;
 
-        if ($existing_user) {
-            UserLoggedInEvent::dispatch($existing_user);
-            $this->info("User with email $email just logged in via social auth");
-        } else {
+        if (! $existing_user) {
             // Split name to individual names
             $split_names = explode(' ', $name);
             $first_name = $split_names[0];

@@ -14,6 +14,10 @@ return new class () extends Migration {
             $table->id();
             // polymorphic columns: authenticatable_id, authenticatable_type
             $table->morphs('authenticatable');
+            $table->unique(['authenticatable_type', 'authenticatable_id'], 'two_factor_owner_unique');
+            $table->unsignedBigInteger('last_used_step')->nullable();
+            $table->unsignedInteger('setup_attempts')->default(0);
+            $table->unsignedBigInteger('policy_version')->default(0);
 
             $table->text('secret')->nullable();
             $table->string('type')->default('totp')->nullable();

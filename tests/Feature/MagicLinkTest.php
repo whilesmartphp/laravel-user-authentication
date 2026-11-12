@@ -2,116 +2,71 @@
 
 namespace Whilesmart\UserAuthentication\Tests\Feature;
 
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Event;
-use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
-use Whilesmart\UserAuthentication\Services\TwoFactorService;
-use Whilesmart\UserAuthentication\Tests\TestCase;
+use Whilesmart\UserAuthentication\Tests\TwoFactorTestCase;
 
-class MagicLinkTest extends TestCase
+class MagicLinkTest extends TwoFactorTestCase
 {
-    /** @test */
-    public function test_it_authenticates_user_via_persistent_magic_link()
+    public function test_get_is_inert_and_post_consumes_link_and_pending_once()
     {
-        $user = $this->createUser();
-        $token = \Illuminate\Support\Str::random(64);
-
-        // Create the record in our new magic_links table
-        \Whilesmart\UserAuthentication\Models\MagicLink::create([
-            'user_id' => $user->id,
-            'token' => hash('sha256', $token),
-            'expires_at' => now()->addMinutes(15),
-            'is_used' => false,
-        ]);
-
-        $response = $this->getJson("/api/2fa/verify?token={$token}&user={$user->id}");
-
-        $response->assertStatus(200)
-            ->assertJsonPath('data.token', fn (string $tokenValue) => ! empty($tokenValue))
-            ->assertJsonPath('data.token_type', 'Bearer')
-            ->assertJsonPath('data.user.id', $user->id);
+        config(['user-authentication.magic_link.url' => 'https://auth.example.com/verify']);
+        $user = $this->emailUser();
+        [$pending, $code, $link, $url] = $this->sentChallenge($user);
+        $this->assertStringStartsWith('https://auth.example.com/verify?', $url);
+        $this->getJson('/api/2fa/verify?token=' . $link)->assertStatus(405);
+        $this->getJson('/api/2fa/verify-link?token=' . $link)->assertStatus(405);
+        $this->assertSame(0, $user->tokens()->count());
+        $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $pending, 'token' => $link])->assertOk()
+            ->assertJsonMissingPath('data.user.two_factor_auth');
+        $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $pending, 'token' => $link])
+            ->assertUnauthorized();
+        $this->verify($pending, $code)->assertUnauthorized();
     }
 
-    /** @test */
-    public function test_it_rejects_expired_magic_link()
+    public function test_link_cannot_bypass_a_changed_totp_policy()
     {
-        $user = $this->createUser();
-        $token = \Illuminate\Support\Str::random(64);
-
-        \Whilesmart\UserAuthentication\Models\MagicLink::create([
-            'user_id' => $user->id,
-            'token' => hash('sha256', $token),
-            'expires_at' => now()->subMinute(),
-            'is_used' => false,
-        ]);
-
-        $response = $this->getJson("/api/2fa/verify?token={$token}&user={$user->id}");
-
-        $response->assertStatus(403);
-    }
-
-    /** @test */
-    public function test_it_rejects_already_used_magic_link()
-    {
-        $user = $this->createUser();
-        $token = \Illuminate\Support\Str::random(64);
-
-        \Whilesmart\UserAuthentication\Models\MagicLink::create([
-            'user_id' => $user->id,
-            'token' => hash('sha256', $token),
-            'expires_at' => now()->addMinutes(15),
-            'is_used' => true,
-        ]);
-
-        $response = $this->getJson("/api/2fa/verify?token={$token}");
-
-        $response->assertStatus(403);
-    }
-
-    /** @test */
-    public function test_magic_link_url_uses_configured_base_url()
-    {
-        $user = $this->createUser();
-        Config::set('user-authentication.magic_link.url', 'https://auth.example.com/verify');
-
-        Event::fake([VerificationCodeGeneratedEvent::class]);
-
-        app(TwoFactorService::class)->handleChallenge($user, 'email', $user->email);
-
-        Event::assertDispatched(VerificationCodeGeneratedEvent::class, function ($event) {
-            return str_starts_with($event->magicLink, 'https://auth.example.com/verify?token=')
-                && ! str_contains($event->magicLink, 'user=');
-        });
-    }
-
-    /** @test */
-    public function test_totp_user_can_authenticate_via_magic_link_without_totp_code()
-    {
-        $user = \Whilesmart\UserAuthentication\Models\User::create([
-            'first_name' => 'Test',
-            'email' => 'totp-magic-auth@example.com',
-            'password' => bcrypt('password123'),
-        ]);
-
-        $user->twoFactorAuth()->create([
+        $user = $this->emailUser();
+        [$pending, , $link] = $this->sentChallenge($user);
+        $user->twoFactorAuth()->first()->update([
             'type' => 'totp',
-            'is_enabled' => true,
-            'secret' => 'KVKFKRJTMR2G6KBV',
+            'secret' => app('pragmarx.google2fa')->generateSecretKey(),
         ]);
-
-        $token = \Illuminate\Support\Str::random(64);
-        \Whilesmart\UserAuthentication\Models\MagicLink::create([
-            'user_id' => $user->id,
-            'token' => hash('sha256', $token),
-            'expires_at' => now()->addMinutes(15),
-            'is_used' => false,
-        ]);
-
-        $response = $this->getJson("/api/2fa/verify?token={$token}");
-
-        $response->assertStatus(200)
-            ->assertJsonPath('data.token', fn (string $tokenValue) => ! empty($tokenValue))
-            ->assertJsonPath('data.token_type', 'Bearer')
-            ->assertJsonPath('data.user.id', $user->id);
+        $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $pending, 'token' => $link])
+            ->assertUnprocessable();
+        $this->assertSame(0, $user->tokens()->count());
     }
+
+    public function test_link_is_bound_to_its_pending_login_and_expires()
+    {
+        [$pending, , $link] = $this->sentChallenge($this->emailUser());
+        [$other] = $this->sentChallenge($this->emailUser());
+        $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $other, 'token' => $link])
+            ->assertUnprocessable();
+        $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $pending, 'token' => str_repeat('x', 65)])
+            ->assertUnprocessable();
+        $this->travel(6)->minutes();
+        $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $pending, 'token' => $link])
+            ->assertUnauthorized();
+    }
+
+    public function test_issuing_another_login_invalidates_old_link()
+    {
+        $user = $this->emailUser();
+        [$old, , $link] = $this->sentChallenge($user);
+        [$pending, , $freshLink] = $this->sentChallenge($user);
+        $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $old, 'token' => $link])->assertUnauthorized();
+        $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $pending, 'token' => $link])
+            ->assertUnprocessable();
+        $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $pending, 'token' => $freshLink])->assertOk();
+    }
+    public function test_link_stays_invalid_after_factor_policy_is_changed_back()
+    {
+        $user = $this->emailUser();
+        [$pending, , $link] = $this->sentChallenge($user);
+        $factor = $user->twoFactorAuth()->first();
+        $factor->update(['type' => 'phone']);
+        $factor->update(['type' => 'email']);
+        $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $pending, 'token' => $link])
+            ->assertUnprocessable();
+    }
+
 }

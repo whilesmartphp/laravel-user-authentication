@@ -2,96 +2,62 @@
 
 namespace Whilesmart\UserAuthentication\Tests\Feature;
 
-use Illuminate\Support\Facades\Auth;
-use Whilesmart\UserAuthentication\Models\User;
-use Whilesmart\UserAuthentication\Tests\TestCase;
+use Whilesmart\UserAuthentication\Tests\TwoFactorTestCase;
 
-class TwoFactorMiddlewareTest extends TestCase
+class TwoFactorMiddlewareTest extends TwoFactorTestCase
 {
-    /** @test */
-    public function test_users_with_2fa_enabled_are_intercepted()
+    public function test_wildcard_token_is_rejected_on_package_security_routes()
     {
-        // 1. Create a user with 2FA enabled
-        // $user = $this->createUser();
-        $user = User::create([
-            'first_name' => 'Mercy',
-            'last_name' => 'Ma',
-            'email' => 'mercy@gmail.com',
-            'password' => bcrypt('password123'),
-        ]);
+        $user = $this->createUser();
+        $token = $this->passwordLogin($user)->assertOk()->json('data.token');
         $user->twoFactorAuth()->create([
-            'secret' => 'KVKFKRJTMR2G6KBV',
             'type' => 'totp',
             'is_enabled' => true,
+            'secret' => app('pragmarx.google2fa')->generateSecretKey(),
         ]);
-
-        // 2. Act as the user (simulate password login success)
-        // Auth::login($user);
-
-        // 3. Try to access a protected route
-        // $response = $this->getJson('/api/user-profile');
-        $response = $this->postJson('/api/login', [
-            'email' => $user->email,
-            'password' => 'password123',
-        ]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'message' => 'Two-factor authentication required.',
-            'data' => [
-                'two_factor_required' => true,
-                'method' => 'totp',
-            ],
-        ]);
-        // Ensure the user remains unauthenticated/not logged in
-        $this->assertFalse(Auth::check());
+        foreach (['setup', 'confirm', 'disable'] as $action) {
+            $this->postJson('/api/2fa/' . $action, [], $this->bearer($token))->assertForbidden();
+        }
+        $response = $this->passwordLogin($user)
+            ->assertOk()
+            ->assertJsonPath('data.two_factor_required', true)
+            ->assertJsonMissingPath('data.token');
+        $this->assertNotEmpty($response->json('data.two_factor_token'));
+        $this->assertSame(1, $user->tokens()->count());
     }
 
-    /** @test */
-    public function test_middleware_blocks_access_to_temporary_protected_route()
+    public function test_real_token_without_2fa_can_reach_setup()
     {
-        $this->app['router']->get('/api/test-protected', function () {
-            return response()->json(['success' => true]);
-        })->middleware(['web', \Whilesmart\UserAuthentication\Http\Middleware\RedirectIfTwoFactorEnabled::class]);
-
-        $user = User::create([
-            'first_name' => 'Middleware',
-            'last_name' => 'Test',
-            'email' => 'middleware@example.com',
-            'password' => bcrypt('password123'),
-        ]);
-
-        $user->twoFactorAuth()->create([
-            'secret' => 'KVKFKRJTMR2G6KBV',
-            'type' => 'totp',
-            'is_enabled' => true,
-        ]);
-
-        $response = $this->actingAs($user)->getJson('/api/test-protected');
-
-        $response->assertStatus(403);
-        $response->assertJsonFragment(['two_factor_required' => true]);
+        $user = $this->createUser();
+        $token = $this->passwordLogin($user)->assertOk()->json('data.token');
+        $this->postJson('/api/2fa/setup', [], $this->bearer($token))->assertOk();
     }
 
-    /** @test */
-    public function test_users_without_2fa_pass_through_middleware()
+    public function test_named_limiters_return_429_for_every_sensitive_operation()
     {
-        $this->app['router']->get('/api/test-pass-protected', function () {
-            return response()->json(['success' => true]);
-        })->middleware(['web', \Whilesmart\UserAuthentication\Http\Middleware\RedirectIfTwoFactorEnabled::class]);
+        foreach (['verify', 'resend', 'link', 'setup', 'confirm', 'disable'] as $operation) {
+            config(['user-authentication.two_factor.rate_limits.' . $operation => 1]);
+        }
+        $user = $this->createUser();
+        $token = $this->passwordLogin($user)->assertOk()->json('data.token');
+        foreach (['setup', 'confirm', 'disable'] as $operation) {
+            $this->postJson('/api/2fa/' . $operation, [], $this->bearer($token));
+            $this->postJson('/api/2fa/' . $operation, [], $this->bearer($token))->assertStatus(429);
+        }
+        foreach (['verify', 'resend', 'verify-link'] as $operation) {
+            $this->postJson('/api/2fa/' . $operation);
+            $this->postJson('/api/2fa/' . $operation)->assertStatus(429);
+        }
+    }
 
-        $user = User::create([
-            'first_name' => 'No2FA',
-            'last_name' => 'User',
-            'email' => 'no2fa@example.com',
-            'password' => bcrypt('password123'),
-        ]);
-
-        // User has NO twoFactorAuth relation
-        $response = $this->actingAs($user)->getJson('/api/test-pass-protected');
-
-        $response->assertStatus(200);
-        $response->assertJson(['success' => true]);
+    public function test_account_limiter_survives_ip_and_challenge_rotation()
+    {
+        config(['user-authentication.two_factor.rate_limits.verify' => 1]);
+        $user = $this->emailUser();
+        [$pending, $code] = $this->sentChallenge($user);
+        $this->verify($pending, $code)->assertOk();
+        [$fresh, $freshCode] = $this->sentChallenge($user);
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.2']);
+        $this->verify($fresh, $freshCode)->assertStatus(429);
     }
 }

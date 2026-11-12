@@ -4,29 +4,24 @@ namespace Whilesmart\UserAuthentication\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Whilesmart\UserAuthentication\Services\TwoFactorService;
+use Laravel\Sanctum\Contracts\HasAbilities;
+use Whilesmart\UserAuthentication\Models\User;
 
 class RedirectIfTwoFactorEnabled
 {
-    /**
-     * Handle an incoming request.
-     */
     public function handle(Request $request, Closure $next)
     {
-        /** @var \Whilesmart\UserAuthentication\Models\User|null $user */
+        /** @var User|null $user */
         $user = $request->user();
-
-        if ($user && $user->hasTwoFactorEnabled() && ! $user->tokenCan('2fa-verified')) {
-            $type = $user->twoFactorAuth->type;
-            $contact = ($type === 'phone') ? $user->phone : $user->email;
-            $service = app(TwoFactorService::class);
-
-            return response()->json([
-                'message' => 'Two-factor authentication required.',
-                'two_factor_required' => true,
-                'method' => $type,
-                'two_factor_token' => $service->generatePendingToken($user, $contact, $type),
-            ], 403);
+        if ($user && $user->twoFactorAuth()->where('is_enabled', true)->exists()) {
+            /** @var HasAbilities|null $token */
+            $token = $user->currentAccessToken();
+            if (! $token || ! in_array('2fa-verified', $token->abilities ?? [], true)) {
+                return response()->json([
+                    'message' => 'Two-factor authentication required. Please sign in again.',
+                    'two_factor_required' => true,
+                ], 403);
+            }
         }
 
         return $next($request);

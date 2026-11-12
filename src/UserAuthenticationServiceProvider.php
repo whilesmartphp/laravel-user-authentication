@@ -2,10 +2,14 @@
 
 namespace Whilesmart\UserAuthentication;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Whilesmart\UserAuthentication\Interfaces\ResponseFormatterInterface;
 use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
+use Whilesmart\UserAuthentication\Services\TwoFactorService;
 
 class UserAuthenticationServiceProvider extends ServiceProvider
 {
@@ -42,6 +46,27 @@ class UserAuthenticationServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+
+        foreach (['verify', 'resend', 'link', 'setup', 'confirm', 'disable'] as $operation) {
+            RateLimiter::for('two-factor-' . $operation, function (Request $request) use ($operation) {
+                $token = $request->input('two_factor_token');
+                if (in_array($operation, ['verify', 'resend', 'link'], true)) {
+                    $account = is_string($token) && strlen($token) <= 2048
+                        ? app(TwoFactorService::class)->accountKey($token) : 'invalid';
+                } else {
+                    $user = $request->user();
+                    $account = $user
+                        ? hash('sha256', $user->getMorphClass() . ':' . $user->getAuthIdentifier()) : 'guest';
+                }
+                $minutes = max(1, (int) config('user-authentication.two_factor.rate_limits.minutes', 1));
+                $attempts = max(1, (int) config('user-authentication.two_factor.rate_limits.' . $operation, 5));
+
+                return [
+                    Limit::perMinutes($minutes, $attempts)->by($operation . ':ip:' . $request->ip()),
+                    Limit::perMinutes($minutes, $attempts)->by($operation . ':account:' . $account),
+                ];
+            });
+        }
 
         $this->loadTranslationsFrom(__DIR__ . '/../lang', 'user-authentication');
 

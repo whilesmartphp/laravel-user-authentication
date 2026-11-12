@@ -23,8 +23,15 @@ use Whilesmart\UserAuthentication\Models\TwoFactorAuth;
  */
 trait HasTwoFactorAuth
 {
+    public function initializeHasTwoFactorAuth(): void
+    {
+        $this->makeHidden(['twoFactorAuth', 'two_factor_auth']);
+    }
+
     /**
      * Link to the 2FA settings.
+     *
+     * @return MorphOne<TwoFactorAuth, $this>
      */
     public function twoFactorAuth(): MorphOne
     {

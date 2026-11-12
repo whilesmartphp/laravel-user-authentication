@@ -13,6 +13,8 @@ use Whilesmart\UserAuthentication\Traits\HasTwoFactorAuth;
  * @property int $id
  * @property string $email
  * @property string $password
+ * @property string|null $username
+ * @property \Illuminate\Support\Carbon|null $email_verified_at
  * @property string|null $first_name
  * @property string|null $last_name
  * @property string|null $phone
@@ -55,6 +57,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'twoFactorAuth',
+        'two_factor_auth',
 
     ];
 
