@@ -248,8 +248,10 @@ class UserAuthOpenApiDocs
     }
 
     #[OA\Post(
-        path: '/passkeys/register-options',
+        path: '/passkeys/register/options',
         summary: 'Generate WebAuthn registration options',
+        description: 'User verification is required by default. '
+            . 'The single-use session is bound to the authenticated user.',
         security: [
             ['sanctum' => []],
         ],
@@ -264,6 +266,7 @@ class UserAuthOpenApiDocs
         ),
         tags: ['Passkey'],
         responses: [
+            new OA\Response(response: 429, description: 'Passkey rate limit exceeded'),
             new OA\Response(
                 response: 200,
                 description: 'Options generated',
@@ -283,7 +286,7 @@ class UserAuthOpenApiDocs
                                 new OA\Property(
                                     property: 'session_id',
                                     type: 'string',
-                                    example: 'reg_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                                    example: '550e8400-e29b-41d4-a716-446655440000'
                                 ),
                             ],
                             type: 'object'
@@ -323,8 +326,11 @@ class UserAuthOpenApiDocs
     }
 
     #[OA\Post(
-        path: '/passkeys/login-options',
+        path: '/passkeys/login/options',
         summary: 'Generate WebAuthn login options',
+        description: 'Email requests return a configured number of padded descriptors (default: 10) '
+            . 'regardless of account existence. USER_AUTH_PASSKEY_MAX_CREDENTIALS also caps passkeys per user. '
+            . 'Without email, the allow list is empty. User verification is required by default.',
         security: [],
         requestBody: new OA\RequestBody(
             content: new OA\JsonContent(
@@ -335,6 +341,7 @@ class UserAuthOpenApiDocs
         ),
         tags: ['Passkey'],
         responses: [
+            new OA\Response(response: 429, description: 'Passkey rate limit exceeded'),
             new OA\Response(
                 response: 200,
                 description: 'Options generated',
@@ -354,23 +361,11 @@ class UserAuthOpenApiDocs
                                 new OA\Property(
                                     property: 'session_id',
                                     type: 'string',
-                                    example: 'log_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                                    example: '550e8400-e29b-41d4-a716-446655440000'
                                 ),
                             ],
                             type: 'object'
                         ),
-                    ],
-                    type: 'object'
-                )
-            ),
-            new OA\Response(
-                response: 400,
-                description: 'Invalid credentials',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'success', type: 'boolean', example: false),
-                        new OA\Property(property: 'message', type: 'string'),
-                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
                     ],
                     type: 'object'
                 )
@@ -402,13 +397,14 @@ class UserAuthOpenApiDocs
             content: new OA\JsonContent(
                 required: ['session_id', 'passkey'],
                 properties: [
-                    new OA\Property(property: 'session_id', type: 'string'),
+                    new OA\Property(property: 'session_id', type: 'string', format: 'uuid'),
                     new OA\Property(property: 'passkey', type: 'object'),
                 ]
             )
         ),
         tags: ['Passkey'],
         responses: [
+            new OA\Response(response: 429, description: 'Passkey rate limit exceeded'),
             new OA\Response(
                 response: 200,
                 description: 'Authenticated successfully',
@@ -471,13 +467,15 @@ class UserAuthOpenApiDocs
                 required: ['name', 'session_id', 'passkey'],
                 properties: [
                     new OA\Property(property: 'name', type: 'string'),
-                    new OA\Property(property: 'session_id', type: 'string'),
+                    new OA\Property(property: 'session_id', type: 'string', format: 'uuid'),
                     new OA\Property(property: 'passkey', type: 'object'),
                 ]
             )
         ),
         tags: ['Passkey'],
         responses: [
+            new OA\Response(response: 409, description: 'Credential already registered or passkey limit reached'),
+            new OA\Response(response: 429, description: 'Passkey rate limit exceeded'),
             new OA\Response(
                 response: 200,
                 description: 'Passkey created',

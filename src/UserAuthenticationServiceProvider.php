@@ -2,6 +2,9 @@
 
 namespace Whilesmart\UserAuthentication;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Whilesmart\UserAuthentication\Interfaces\ResponseFormatterInterface;
@@ -42,6 +45,21 @@ class UserAuthenticationServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+
+        foreach (['login-options', 'login', 'register-options', 'register'] as $action) {
+            RateLimiter::for('passkey-' . $action, function (Request $request) use ($action) {
+                $limits = [Limit::perMinute((int) config('user-authentication.passkey.rate_limits.ip'))
+                    ->by($action . ':ip:' . $request->ip())];
+                $email = str_starts_with($action, 'register')
+                    ? $request->user()?->email
+                    : $request->input('email');
+                if (is_string($email) && $email !== '') {
+                    $limits[] = Limit::perMinute((int) config('user-authentication.passkey.rate_limits.email'))
+                        ->by($action . ':email:' . hash('sha256', strtolower(trim($email))));
+                }
+                return $limits;
+            });
+        }
 
         $this->loadTranslationsFrom(__DIR__ . '/../lang', 'user-authentication');
 

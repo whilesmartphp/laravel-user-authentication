@@ -23,15 +23,15 @@ Route::post('/send-verification-code', [AuthController::class, 'sendVerification
 Route::post('/verify-code', [AuthController::class, 'verifyCode']);
 Route::post('/password/reset-code', [PasswordResetController::class, 'sendPasswordResetCode']);
 Route::post('/password/reset', [PasswordResetController::class, 'resetPasswordWithCode']);
-Route::post('/passkeys/login/options', [PasskeyController::class, 'loginOptions']);
-Route::post('/passkeys/login', [PasskeyController::class, 'login']);
+Route::post('/passkeys/login/options', [PasskeyController::class, 'loginOptions'])->middleware('throttle:passkey-login-options');
+Route::post('/passkeys/login', [PasskeyController::class, 'login'])->middleware('throttle:passkey-login');
 
 // Resource routes
 Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('logout', [AuthController::class, 'logout']);
 
-    Route::post('/passkeys/register/options', [PasskeyController::class, 'registerOptions']);
-    Route::post('/passkeys/register', [PasskeyController::class, 'register']);
+    Route::post('/passkeys/register/options', [PasskeyController::class, 'registerOptions'])->middleware('throttle:passkey-register-options');
+    Route::post('/passkeys/register', [PasskeyController::class, 'register'])->middleware('throttle:passkey-register');
     Route::delete('/passkeys/{id}', [PasskeyController::class, 'destroy']);
     Route::get('/passkeys', [PasskeyController::class, 'index']);
 });

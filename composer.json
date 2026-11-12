@@ -42,7 +42,7 @@
     "laravel/socialite": "^5.23",
     "kreait/laravel-firebase": "^6.1",
     "socialiteproviders/apple": "^5.8",
-    "web-auth/webauthn-lib": "^5.0"
+    "web-auth/webauthn-lib": "^5.3.5"
   },
   "autoload-dev": {
     "psr-4": {

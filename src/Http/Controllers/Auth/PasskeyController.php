@@ -3,6 +3,8 @@
 namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -59,8 +61,7 @@ class PasskeyController extends Controller
         $options = $this->passkeyService->getRegistrationOptions((string) $user->id, $user->email, $displayName);
 
         $options = Passkey::webAuthnSerializer()->serialize($options, 'json');
-        $sessionId = "reg_" . Str::uuid()->toString();
-        Cache::add($sessionId, $options, now()->addMinutes(config('user-authentication.passkey.session_lifetime')));
+        $sessionId = $this->storeCeremony('register', $options, (string) $user->id);
 
         $response = $this->success(['options' => $options, 'session_id' => $sessionId]);
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER_OPTIONS);
@@ -99,18 +100,10 @@ class PasskeyController extends Controller
             }
         }
 
-        $options = $this->passkeyService->getLoginOptions($userId);
+        $options = $this->passkeyService->getLoginOptions($userId, $request->input('email'), $request);
         $options = Passkey::webAuthnSerializer()->serialize($options, 'json');
 
-        $sessionId = "log_" . Str::uuid()->toString();
-        Cache::add(
-            $sessionId,
-            json_encode([
-                'options' => $options,
-                'userHandle' => $userId !== null ? (string) $userId : null,
-            ]),
-            now()->addMinutes(config('user-authentication.passkey.session_lifetime'))
-        );
+        $sessionId = $this->storeCeremony('login', $options, $userId !== null ? (string) $userId : null);
 
         $response = $this->success(['options' => $options, 'session_id' => $sessionId]);
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN_OPTIONS);
@@ -127,7 +120,7 @@ class PasskeyController extends Controller
 
         $validationRules = [
             'passkey' => ['required', 'array'],
-            'session_id' => ['required', 'string']
+            'session_id' => ['required', 'string', 'uuid']
         ];
 
         $validator = Validator::make($request->all(), $validationRules);
@@ -140,20 +133,18 @@ class PasskeyController extends Controller
 
         $data = $request->only(['passkey', 'session_id']);
 
-        $cached = Cache::pull($data['session_id']);
-        if (is_null($cached)) {
+        $cached = $this->consumeCeremony('login', $data['session_id']);
+        if ($cached === null) {
             $response = $this->failure(__('Invalid session id'));
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
         }
-        $cached = json_decode($cached, true);
-        $options = $cached['options'] ?? $cached;
-        $userHandle = $cached['userHandle'] ?? null;
+        $options = $cached['options'];
+        $userHandle = $cached['userHandle'];
 
         try {
             $passkey = $this->passkeyService->verifyPasskey(
                 $data['passkey'],
                 $options,
-                $request->getHost(),
                 $userHandle
             );
         } catch (\Exception $e) {
@@ -191,7 +182,7 @@ class PasskeyController extends Controller
 
         $validationRules = [
             'name' => ['required', 'string', 'max:255'],
-            'session_id' => ['required', 'string'],
+            'session_id' => ['required', 'string', 'uuid'],
             'passkey' => ['required', 'array'],
         ];
 
@@ -204,8 +195,8 @@ class PasskeyController extends Controller
         }
         $data = $request->all();
 
-        $options = Cache::pull($data['session_id']);
-        if (is_null($options)) {
+        $cached = $this->consumeCeremony('register', $data['session_id']);
+        if ($cached === null || $cached['owner'] !== (string) $request->user()->id) {
             $response = $this->failure(__('Invalid session id'));
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
         }
@@ -213,8 +204,7 @@ class PasskeyController extends Controller
         try {
             $publicKeyCredentialSource = $this->passkeyService->getPublicKeyCredentialSource(
                 $data['passkey'],
-                $options,
-                $request->getHost()
+                $cached['options']
             );
         } catch (\Exception $e) {
             report($e);
@@ -223,21 +213,59 @@ class PasskeyController extends Controller
         }
 
         $user = $request->user();
-        $exists = $user->passkeys()
-            ->where('credential_id', $this->passkeyService->getCredentialId($publicKeyCredentialSource))
-            ->exists();
-        if ($exists) {
-            $response = $this->failure(__('This passkey already exists'));
+        if ($publicKeyCredentialSource->userHandle !== (string) $user->id) {
+            $response = $this->failure(__('This passkey is not valid'), 400);
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
         }
 
-        $request->user()->passkeys()->create([
-            'name' => $data['name'],
-            'credential_id' => $this->passkeyService->getCredentialId($publicKeyCredentialSource),
-            'data' => Passkey::webAuthnSerializer()->serialize($publicKeyCredentialSource, 'json'),
-        ]);
+        try {
+            $created = DB::transaction(function () use ($user, $data, $publicKeyCredentialSource) {
+                $user->newQuery()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+                if ($user->passkeys()->count() >= config('user-authentication.passkey.max_credentials', 10)) {
+                    return false;
+                }
+                $user->passkeys()->create([
+                    'name' => $data['name'],
+                    'credential_id' => $this->passkeyService->getCredentialId($publicKeyCredentialSource),
+                    'data' => Passkey::webAuthnSerializer()->serialize($publicKeyCredentialSource, 'json'),
+                ]);
+                return true;
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            $response = $this->failure(__('This passkey already exists'), 409);
+            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
+        }
+        if (!$created) {
+            $response = $this->failure(__('Passkey limit reached'), 409);
+            return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
+        }
         $response = $this->success(message: __('Passkey created'));
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_REGISTER);
+    }
+
+    private function storeCeremony(string $purpose, string $options, ?string $userId): string
+    {
+        $sessionId = Str::uuid()->toString();
+        Cache::put('passkey:' . $purpose . ':' . $sessionId, [
+            'purpose' => $purpose,
+            'owner' => $purpose === 'register' ? $userId : null,
+            'options' => $options,
+            'userHandle' => $purpose === 'login' ? $userId : null,
+        ], now()->addMinutes(config('user-authentication.passkey.session_lifetime')));
+        return $sessionId;
+    }
+
+    private function consumeCeremony(string $purpose, string $sessionId): ?array
+    {
+        $key = 'passkey:' . $purpose . ':' . $sessionId;
+        $cached = Cache::lock($key . ':lock', 10)->get(function () use ($key, $purpose) {
+            $ceremony = Cache::get($key);
+            if (!is_array($ceremony) || ($ceremony['purpose'] ?? null) !== $purpose) {
+                return null;
+            }
+            return Cache::forget($key) ? $ceremony : null;
+        });
+        return is_array($cached) ? $cached : null;
     }
 
     public function index(Request $request): JsonResponse
