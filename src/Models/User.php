@@ -19,8 +19,6 @@ use Whilesmart\UserAuthentication\Traits\HasTwoFactorAuth;
  * @property string|null $first_name
  * @property string|null $last_name
  * @property string|null $phone
- * @property string|null $two_factor_type
- * @property-read \Whilesmart\UserAuthentication\Models\TwoFactorAuth|null $twoFactorAuth
  * @property-read \Illuminate\Database\Eloquent\Collection<int, OauthAccount> $oauthAccounts
  *
  * @method bool hasTwoFactorEnabled()
@@ -59,8 +57,9 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-        'twoFactorAuth',
-        'two_factor_auth',
+        'factors',
+        'recoveryCodes',
+        'recovery_codes',
 
     ];
 

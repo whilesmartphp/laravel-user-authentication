@@ -265,7 +265,7 @@ class PasskeyController extends Controller
     {
         $request = $this->runBeforeHooks($request, HookAction::PASSKEY_INDEX);
 
-        $passkeys = $request->user()->passkeys
+        $passkeys = $request->user()->passkeys()->get()
             ->makeHidden(['data', 'keyable_type', 'keyable_id']);
         $response = $this->success(data: ['passkeys' => $passkeys], message: __('Passkeys retrieved'));
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_INDEX);

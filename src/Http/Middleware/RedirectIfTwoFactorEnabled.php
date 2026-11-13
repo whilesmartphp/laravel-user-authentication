@@ -13,7 +13,7 @@ class RedirectIfTwoFactorEnabled
     {
         /** @var User|null $user */
         $user = $request->user();
-        if ($user && $user->twoFactorAuth()->where('is_enabled', true)->exists()) {
+        if ($user && $user->hasTwoFactorEnabled()) {
             /** @var HasAbilities|null $token */
             $token = $user->currentAccessToken();
             if (! $token || ! in_array('2fa-verified', $token->abilities ?? [], true)) {

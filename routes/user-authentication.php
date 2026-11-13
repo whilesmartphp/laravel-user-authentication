@@ -30,6 +30,9 @@ Route::post('/passkeys/login', [PasskeyController::class, 'login'])->middleware(
 Route::group(['middleware' => ['auth:sanctum', 'two-factor']], function () {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::prefix('2fa')->group(function () {
+        Route::get('/factors', [TwoFactorController::class, 'index']);
+        Route::post('/recovery-codes', [TwoFactorController::class, 'regenerateRecoveryCodes'])
+            ->middleware('throttle:two-factor-confirm');
         Route::post('/setup', [TwoFactorController::class, 'setup'])->middleware('throttle:two-factor-setup');
         Route::post('/confirm', [TwoFactorController::class, 'confirm'])->middleware('throttle:two-factor-confirm');
         Route::post('/disable', [TwoFactorController::class, 'disable'])->middleware('throttle:two-factor-disable');

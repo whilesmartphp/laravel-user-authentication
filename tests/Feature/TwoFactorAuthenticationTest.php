@@ -15,10 +15,18 @@ class TwoFactorAuthenticationTest extends TwoFactorTestCase
         $current = $this->passwordLogin($user)->assertOk()->json('data.token');
         $secret = $this->postJson('/api/2fa/setup', [], $this->bearer($current))->assertOk()->json('data.secret');
         $code = app('pragmarx.google2fa')->getCurrentOtp($secret);
-        $this->postJson('/api/2fa/confirm', ['code' => $code], $this->bearer($current))->assertOk();
-        $this->postJson('/api/2fa/disable', [], $this->bearer($old))->assertUnauthorized();
-        $this->postJson('/api/2fa/confirm', ['code' => $code], $this->bearer($current))->assertStatus(400);
-        $this->postJson('/api/2fa/setup', [], $this->bearer($current))->assertStatus(400);
+        $this->postJson('/api/2fa/confirm', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+            'code' => $code,
+        ], $this->bearer($current))->assertOk();
+        $this->postJson('/api/2fa/disable', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+        ], $this->bearer($old))->assertUnauthorized();
+        $this->postJson('/api/2fa/confirm', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+            'code' => $code,
+        ], $this->bearer($current))->assertStatus(400);
+        $this->postJson('/api/2fa/setup', [], $this->bearer($current))->assertOk();
     }
 
     public function test_disable_requires_a_factor_even_with_no_recovery_codes_remaining()
@@ -31,14 +39,19 @@ class TwoFactorAuthenticationTest extends TwoFactorTestCase
                 $this->travel(2)->minutes();
             }
         }
-        $this->postJson('/api/2fa/disable', [], $this->bearer($token))->assertUnprocessable();
+        $this->postJson('/api/2fa/disable', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+        ], $this->bearer($token))->assertUnprocessable();
         $this->assertTrue($user->fresh()->hasTwoFactorEnabled());
     }
 
     public function test_unused_recovery_code_disables_and_revokes_sessions()
     {
         [$user, $token, , $codes] = $this->enroll();
-        $this->postJson('/api/2fa/disable', ['code' => $codes[0]], $this->bearer($token))->assertOk();
+        $this->postJson('/api/2fa/disable', [
+            'factor_id' => $user->factors()->value('id'),
+            'code' => $codes[0],
+        ], $this->bearer($token))->assertOk();
         $this->assertFalse($user->fresh()->hasTwoFactorEnabled());
         $this->postJson('/api/2fa/setup', [], $this->bearer($token))->assertUnauthorized();
     }
@@ -46,10 +59,16 @@ class TwoFactorAuthenticationTest extends TwoFactorTestCase
     public function test_fresh_totp_disables_but_the_setup_code_cannot_be_replayed()
     {
         [$user, $token, $secret, , $setupCode] = $this->enroll();
-        $this->postJson('/api/2fa/disable', ['code' => $setupCode], $this->bearer($token))->assertUnprocessable();
+        $this->postJson('/api/2fa/disable', [
+            'factor_id' => $user->factors()->value('id'),
+            'code' => $setupCode,
+        ], $this->bearer($token))->assertUnprocessable();
         $google = app('pragmarx.google2fa');
         $code = $google->oathTotp($secret, $google->getTimestamp() + 1);
-        $this->postJson('/api/2fa/disable', ['code' => $code], $this->bearer($token))->assertOk();
+        $this->postJson('/api/2fa/disable', [
+            'factor_id' => $user->factors()->value('id'),
+            'code' => $code,
+        ], $this->bearer($token))->assertOk();
         $this->assertFalse($user->fresh()->hasTwoFactorEnabled());
     }
 
@@ -58,19 +77,23 @@ class TwoFactorAuthenticationTest extends TwoFactorTestCase
         $user = $this->emailUser();
         [$pending, $loginCode] = $this->sentChallenge($user);
         $token = $this->verify($pending, $loginCode)->assertOk()->json('data.token');
-        $pending = $this->postJson('/api/2fa/disable', [], $this->bearer($token))
+        $pending = $this->postJson('/api/2fa/disable', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+        ], $this->bearer($token))
             ->assertOk()
             ->json('data.two_factor_token');
         $event = Event::dispatched(VerificationCodeGeneratedEvent::class)->last()[0];
         $this->assertNull($event->magicLink);
         $this->assertSame('disable_2fa_email', $event->purpose);
         $this->postJson('/api/2fa/disable', [
+            'factor_id' => $user->factors()->value('id'),
             'two_factor_token' => $pending,
             'code' => 'INVALID000',
         ], $this->bearer($token))
             ->assertUnprocessable();
         $this->assertTrue($user->fresh()->hasTwoFactorEnabled());
         $this->postJson('/api/2fa/disable', [
+            'factor_id' => $user->factors()->value('id'),
             'two_factor_token' => $pending,
             'code' => $event->code,
         ], $this->bearer($token))
@@ -83,15 +106,24 @@ class TwoFactorAuthenticationTest extends TwoFactorTestCase
         config(['user-authentication.two_factor.attempts' => 1]);
         $user = $this->createUser();
         $token = $this->passwordLogin($user)->assertOk()->json('data.token');
-        $this->postJson('/api/2fa/confirm', ['code' => '123456'], $this->bearer($token))->assertStatus(400);
+        $this->postJson('/api/2fa/confirm', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+            'code' => '123456',
+        ], $this->bearer($token))->assertStatus(400);
         $secret = $this->postJson('/api/2fa/setup', [], $this->bearer($token))->assertOk()->json('data.secret');
         $google = app('pragmarx.google2fa');
         $wrong = '000000';
         while ($google->verifyKey($secret, $wrong)) {
             $wrong = str_pad((string) ((int) $wrong + 1), 6, '0', STR_PAD_LEFT);
         }
-        $this->postJson('/api/2fa/confirm', ['code' => $wrong], $this->bearer($token))->assertUnprocessable();
-        $this->postJson('/api/2fa/confirm', ['code' => $google->getCurrentOtp($secret)], $this->bearer($token))
+        $this->postJson('/api/2fa/confirm', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+            'code' => $wrong,
+        ], $this->bearer($token))->assertUnprocessable();
+        $this->postJson('/api/2fa/confirm', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+            'code' => $google->getCurrentOtp($secret),
+        ], $this->bearer($token))
             ->assertStatus(400);
     }
 }

@@ -146,7 +146,13 @@ class UserAuthOpenApiDocs
                                         new OA\Property(
                                             property: 'method',
                                             type: 'string',
-                                            enum: ['totp', 'email', 'phone']
+                                            description: 'Configured factor type'
+                                        ),
+                                        new OA\Property(property: 'factor_id', type: 'integer'),
+                                        new OA\Property(
+                                            property: 'factors',
+                                            type: 'array',
+                                            items: new OA\Items(type: 'object')
                                         ),
                                         new OA\Property(property: 'two_factor_token', type: 'string'),
                                     ]
@@ -297,173 +303,6 @@ class UserAuthOpenApiDocs
         ]
     )]
     public function verifyCode()
-    {
-    }
-
-    #[OA\Post(
-        path: '/2fa/setup',
-        summary: 'Start TOTP setup; returns the secret only for enrollment',
-        security: [['sanctum' => []]],
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 200, description: 'Secret and QR URI for enrollment'),
-            new OA\Response(response: 400, description: 'Already enabled'),
-            new OA\Response(response: 403, description: 'Current token has not completed 2FA'),
-            new OA\Response(response: 429, description: 'IP or account limit reached'),
-        ]
-    )]
-    public function setupTwoFactor()
-    {
-    }
-
-    #[OA\Post(
-        path: '/2fa/confirm',
-        summary: 'Confirm pending setup; returns recovery codes once and revokes other sessions',
-        security: [['sanctum' => []]],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ['code'],
-                properties: [new OA\Property(property: 'code', type: 'string', pattern: '^[0-9]{6}$')]
-            )
-        ),
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 200, description: 'Enabled; current bearer retained and marked verified'),
-            new OA\Response(response: 400, description: 'Setup missing or already enabled'),
-            new OA\Response(
-                response: 422,
-                description: 'Invalid code; setup invalidated after five failed attempts by default'
-            ),
-            new OA\Response(response: 429, description: 'IP or account limit reached'),
-        ]
-    )]
-    public function confirmTwoFactor()
-    {
-    }
-
-    #[OA\Post(
-        path: '/2fa/disable',
-        summary: 'Disable only with a fresh current factor and a verified bearer',
-        security: [['sanctum' => []]],
-        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-            new OA\Property(
-                property: 'code',
-                description: 'Six-digit TOTP, unused 10-character alphanumeric recovery code, or fresh email/SMS code',
-                type: 'string',
-                maxLength: 10
-            ),
-            new OA\Property(
-                property: 'two_factor_token',
-                description: 'For email/SMS, omit both fields to send a disable challenge, then submit its pending '
-                    . 'token and code',
-                type: 'string',
-                maxLength: 2048
-            ),
-        ])),
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 200, description: 'Challenge issued or disabled with all sessions revoked'),
-            new OA\Response(response: 400, description: 'Not enabled'),
-            new OA\Response(response: 422, description: 'Missing, invalid or replayed factor'),
-            new OA\Response(response: 429, description: 'IP or account limit reached'),
-        ]
-    )]
-    public function disableTwoFactor()
-    {
-    }
-
-    #[OA\Post(
-        path: '/2fa/verify',
-        summary: 'Complete the pending password, OAuth, Firebase or passkey sign-in',
-        description: 'Primary sign-in returns data.two_factor_token instead of an access token for enabled '
-            . 'accounts. Challenges expire after five minutes and permit five attempts by default. '
-            . 'Codes, pending tokens and recovery codes are single use. TOTP timesteps cannot be '
-            . 'replayed, including the setup timestep. User responses contain only public identity '
-            . 'fields.',
-        security: [],
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
-            required: ['two_factor_token', 'code'],
-            properties: [
-                new OA\Property(
-                    property: 'two_factor_token',
-                    description: 'Opaque pending token from primary sign-in',
-                    type: 'string',
-                    minLength: 100,
-                    maxLength: 2048
-                ),
-                new OA\Property(
-                    property: 'code',
-                    description: 'Six-digit TOTP, configured 4 to 8 digit email/SMS code, or unused 10-character '
-                        . 'alphanumeric recovery code',
-                    type: 'string',
-                    maxLength: 10
-                ),
-            ]
-        )),
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Access token, Bearer token type and allowlisted user identity'
-            ),
-            new OA\Response(response: 401, description: 'Pending token missing, expired, consumed or exhausted'),
-            new OA\Response(response: 422, description: 'Invalid factor or changed policy'),
-            new OA\Response(response: 429, description: 'IP or account limit reached'),
-        ]
-    )]
-    public function verifyTwoFactor()
-    {
-    }
-
-    #[OA\Post(
-        path: '/2fa/resend',
-        summary: 'Replace an email/SMS login challenge and invalidate its earlier code and link',
-        security: [],
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
-            required: ['two_factor_token'],
-            properties: [new OA\Property(property: 'two_factor_token', type: 'string', minLength: 100, maxLength: 2048)]
-        )),
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Replacement data.two_factor_token; use it for subsequent requests'
-            ),
-            new OA\Response(response: 400, description: 'TOTP cannot be resent'),
-            new OA\Response(response: 401, description: 'Invalid pending token'),
-            new OA\Response(response: 429, description: 'IP or account limit reached'),
-        ]
-    )]
-    public function resendTwoFactor()
-    {
-    }
-
-    #[OA\Post(
-        path: '/2fa/verify-link',
-        summary: 'Consume an email/SMS magic link after frontend confirmation',
-        description: 'The emailed URL points to USER_AUTH_MAGIC_LINK_URL with token and two_factor_token. GET '
-            . 'never authenticates or consumes. The frontend POSTs both values here. Links cannot '
-            . 'satisfy TOTP and are rejected after factor policy changes or challenge replacement. '
-            . 'Default per-IP and per-account limits per minute: verify/link/setup/confirm/disable 5, '
-            . 'resend 3. USER_AUTH_2FA_* overrides configure limits, expiry and attempts.',
-        security: [],
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
-            required: ['token', 'two_factor_token'],
-            properties: [
-                new OA\Property(property: 'token', type: 'string', pattern: '^[a-zA-Z0-9]{64}$'),
-                new OA\Property(property: 'two_factor_token', type: 'string', minLength: 100, maxLength: 2048),
-            ]
-        )),
-        tags: ['Authentication'],
-        responses: [
-            new OA\Response(response: 200, description: 'Authenticated; link and pending token consumed atomically'),
-            new OA\Response(response: 401, description: 'Invalid, expired or consumed pending token'),
-            new OA\Response(response: 422, description: 'Invalid link or changed factor policy'),
-            new OA\Response(response: 429, description: 'IP or account limit reached'),
-        ]
-    )]
-    public function verifyMagicLink()
     {
     }
 
@@ -640,6 +479,12 @@ class UserAuthOpenApiDocs
                             properties: [
                                 new OA\Property(property: 'two_factor_required', type: 'boolean'),
                                 new OA\Property(property: 'method', type: 'string'),
+                                new OA\Property(property: 'factor_id', type: 'integer'),
+                                new OA\Property(
+                                    property: 'factors',
+                                    type: 'array',
+                                    items: new OA\Items(type: 'object')
+                                ),
                                 new OA\Property(property: 'two_factor_token', type: 'string'),
                                 new OA\Property(property: 'token', type: 'string'),
                                 new OA\Property(property: 'token_type', type: 'string', example: 'Bearer'),

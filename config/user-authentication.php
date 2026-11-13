@@ -40,6 +40,13 @@ return [
     ],
 
     'two_factor' => [
+        'max_factors' => env('USER_AUTH_2FA_MAX_FACTORS', 5),
+        'challenge_retention_hours' => env('USER_AUTH_2FA_CHALLENGE_RETENTION_HOURS', 24),
+        'types' => [
+            'totp' => \Whilesmart\UserAuthentication\FactorTypes\TotpFactorType::class,
+            'email' => \Whilesmart\UserAuthentication\FactorTypes\EmailFactorType::class,
+            'phone' => \Whilesmart\UserAuthentication\FactorTypes\PhoneFactorType::class,
+        ],
         'attempts' => env('USER_AUTH_2FA_ATTEMPTS', 5),
         'expiry_minutes' => env('USER_AUTH_2FA_EXPIRY_MINUTES', 5),
         'rate_limits' => [

@@ -245,6 +245,12 @@ Please see the steps [outlined here](https://socialiteproviders.com/Apple/#insta
 - `composer pint` - Run Laravel code style checks
 - `composer openapi` - Run open api documentation generation
 
+## Two-factor authentication
+
+Owners can enroll multiple labeled TOTP factors and one factor for each of email and phone, up to five factors by default. Setup returns a `factor_id`; confirmation, removal and challenge selection name that factor. `GET /api/2fa/factors` lists public factor details. Recovery codes belong to the owner, are shown once and stored with salted password hashing. `POST /api/2fa/recovery-codes` replaces the set.
+
+Custom factor types implement `FactorType` and are registered in `two_factor.types`. Configure `USER_AUTH_2FA_MAX_FACTORS` to change the factor limit. The host must schedule `model:prune` for `Whilesmart\UserAuthentication\Models\AuthChallenge`; `USER_AUTH_2FA_CHALLENGE_RETENTION_HOURS` defaults to 24 hours after expiry. See [Two-factor authentication](docs/two-factor-authentication.md) for enrollment, challenge selection, recovery codes and the scheduler example.
+
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

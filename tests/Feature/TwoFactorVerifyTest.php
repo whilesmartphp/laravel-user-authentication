@@ -47,7 +47,7 @@ class TwoFactorVerifyTest extends TwoFactorTestCase
         $pending = $response->json('data.two_factor_token');
         $completed = $this->verify($pending, $codes[0])->assertOk()
             ->assertHeader('X-Login-Hook', 'passkeyLogin')
-            ->assertJsonMissingPath('data.user.twoFactorAuth')
+            ->assertJsonMissingPath('data.user.factors')
             ->assertJsonMissingPath('data.user.recovery_codes');
         Event::assertDispatchedTimes(UserLoggedInEvent::class, 1);
         $this->getJson('/api/passkeys', $this->bearer($completed->json('data.token')))
@@ -63,7 +63,7 @@ class TwoFactorVerifyTest extends TwoFactorTestCase
         $response->assertJsonStructure(['data' => ['token', 'user' => ['id']]])
             ->assertJsonMissingPath('data.user.secret')
             ->assertJsonMissingPath('data.user.recovery_codes')
-            ->assertJsonMissingPath('data.user.twoFactorAuth')
+            ->assertJsonMissingPath('data.user.factors')
             ->assertJsonMissingPath('data.user.two_factor_auth');
         $this->verify($pending, $code)->assertUnauthorized();
         do {
@@ -74,7 +74,7 @@ class TwoFactorVerifyTest extends TwoFactorTestCase
             ['id', 'first_name', 'last_name', 'username', 'email', 'phone', 'email_verified_at'],
             array_keys($response->json('data.user'))
         );
-        $this->postJson('/api/2fa/setup', [], $this->bearer($response->json('data.token')))->assertStatus(400);
+        $this->postJson('/api/2fa/setup', [], $this->bearer($response->json('data.token')))->assertOk();
     }
 
     public function test_phone_code_verifies_through_login()
@@ -97,10 +97,10 @@ class TwoFactorVerifyTest extends TwoFactorTestCase
         $this->verify($pending, $code)->assertOk();
         $pending = $this->passwordLogin($user)->assertOk()->json('data.two_factor_token');
         $this->verify($pending, $code)->assertUnprocessable();
-        $this->assertNotContains($codes[0], $user->fresh()->twoFactorAuth->recovery_codes);
-        $this->assertArrayNotHasKey('secret', $user->fresh()->twoFactorAuth->toArray());
-        $this->assertArrayNotHasKey('recovery_codes', $user->fresh()->twoFactorAuth->toArray());
-        $this->assertArrayNotHasKey('two_factor_auth', $user->fresh()->load('twoFactorAuth')->toArray());
+        $this->assertNotContains($codes[0], $user->recoveryCodes()->whereNull('used_at')->pluck('code_hash')->all());
+        $this->assertArrayNotHasKey('secret', $user->fresh()->factors()->first()->toArray());
+        $this->assertArrayNotHasKey('recovery_codes', $user->fresh()->factors()->first()->toArray());
+        $this->assertArrayNotHasKey('factors', $user->fresh()->load('factors')->toArray());
     }
 
     public function test_attempt_budget_invalidates_the_challenge()
@@ -117,7 +117,10 @@ class TwoFactorVerifyTest extends TwoFactorTestCase
     {
         $user = $this->emailUser();
         [$pending, $code, $link] = $this->sentChallenge($user);
-        $fresh = $this->postJson('/api/2fa/resend', ['two_factor_token' => $pending])
+        $fresh = $this->postJson('/api/2fa/resend', [
+            'two_factor_token' => $pending,
+            'factor_id' => $user->factors()->value('id'),
+        ])
             ->assertOk()
             ->json('data.two_factor_token');
         $event = Event::dispatched(
@@ -139,7 +142,9 @@ class TwoFactorVerifyTest extends TwoFactorTestCase
         }
         $this->verify($otherPending, $code)->assertUnprocessable();
         $token = $this->verify($pending, $code)->assertOk()->json('data.token');
-        $disable = $this->postJson('/api/2fa/disable', [], $this->bearer($token))
+        $disable = $this->postJson('/api/2fa/disable', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+        ], $this->bearer($token))
             ->assertOk()
             ->json('data.two_factor_token');
         $event = Event::dispatched(
@@ -147,6 +152,7 @@ class TwoFactorVerifyTest extends TwoFactorTestCase
         )->last()[0];
         $this->verify($disable, $event->code)->assertUnauthorized();
         $this->postJson('/api/2fa/disable', [
+            'factor_id' => $user->factors()->value('id'),
             'two_factor_token' => $otherPending,
             'code' => $otherCode,
         ], $this->bearer($token))

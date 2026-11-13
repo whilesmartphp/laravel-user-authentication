@@ -26,7 +26,7 @@ class MagicLinkTest extends TwoFactorTestCase
     {
         $user = $this->emailUser();
         [$pending, , $link] = $this->sentChallenge($user);
-        $user->twoFactorAuth()->first()->update([
+        $user->factors()->first()->update([
             'type' => 'totp',
             'secret' => app('pragmarx.google2fa')->generateSecretKey(),
         ]);
@@ -62,7 +62,7 @@ class MagicLinkTest extends TwoFactorTestCase
     {
         $user = $this->emailUser();
         [$pending, , $link] = $this->sentChallenge($user);
-        $factor = $user->twoFactorAuth()->first();
+        $factor = $user->factors()->first();
         $factor->update(['type' => 'phone']);
         $factor->update(['type' => 'email']);
         $this->postJson('/api/2fa/verify-link', ['two_factor_token' => $pending, 'token' => $link])

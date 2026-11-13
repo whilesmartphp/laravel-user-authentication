@@ -10,9 +10,9 @@ class TwoFactorMiddlewareTest extends TwoFactorTestCase
     {
         $user = $this->createUser();
         $token = $this->passwordLogin($user)->assertOk()->json('data.token');
-        $user->twoFactorAuth()->create([
+        $user->factors()->create([
             'type' => 'totp',
-            'is_enabled' => true,
+            'confirmed_at' => now(),
             'secret' => app('pragmarx.google2fa')->generateSecretKey(),
         ]);
         foreach (['setup', 'confirm', 'disable'] as $action) {

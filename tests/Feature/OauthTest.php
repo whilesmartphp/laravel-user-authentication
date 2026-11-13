@@ -283,8 +283,8 @@ class OauthTest extends TestCase
     public function test_oauth_for_two_factor_user_returns_pending_without_minting_token()
     {
         $user = $this->createUser(['email' => 'test@example.com']);
-        $user->twoFactorAuth()->create([
-            'type' => 'totp', 'is_enabled' => true,
+        $user->factors()->create([
+            'type' => 'totp', 'confirmed_at' => now(),
             'secret' => app('pragmarx.google2fa')->generateSecretKey(),
         ]);
         $this->mockSocialiteDriver($this->mockSocialiteUser(['email' => $user->email]));
@@ -294,7 +294,7 @@ class OauthTest extends TestCase
             ->assertJsonMissingPath('data.token')->json('data.two_factor_token');
         $this->assertSame(0, $user->tokens()->count());
         Event::assertNotDispatched(UserLoggedInEvent::class);
-        $code = app('pragmarx.google2fa')->getCurrentOtp($user->fresh()->twoFactorAuth->secret);
+        $code = app('pragmarx.google2fa')->getCurrentOtp($user->fresh()->factors()->first()->secret);
         $this->postJson('/api/2fa/verify', ['two_factor_token' => $pending, 'code' => $code])->assertOk();
         Event::assertDispatchedTimes(UserLoggedInEvent::class, 1);
     }

@@ -36,7 +36,10 @@ abstract class TwoFactorTestCase extends TestCase
         $token = $this->passwordLogin($user)->assertOk()->json('data.token');
         $secret = $this->postJson('/api/2fa/setup', [], $this->bearer($token))->assertOk()->json('data.secret');
         $code = app('pragmarx.google2fa')->getCurrentOtp($secret);
-        $codes = $this->postJson('/api/2fa/confirm', ['code' => $code], $this->bearer($token))
+        $codes = $this->postJson('/api/2fa/confirm', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+            'code' => $code,
+        ], $this->bearer($token))
             ->assertOk()->json('data.recovery_codes');
 
         return [$user, $token, $secret, $codes, $code];
@@ -45,7 +48,7 @@ abstract class TwoFactorTestCase extends TestCase
     protected function emailUser(string $type = 'email')
     {
         $user = $this->createUser(['phone' => '+1555' . random_int(1000000, 9999999)]);
-        $user->twoFactorAuth()->create(['type' => $type, 'is_enabled' => true]);
+        $user->factors()->create(['type' => $type, 'confirmed_at' => now()]);
 
         return $user;
     }
