@@ -76,7 +76,23 @@ class UserAuthOpenApiDocs
         ),
         tags: ['Authentication'],
         responses: [
-            new OA\Response(response: 201, description: 'User registered successfully'),
+            new OA\Response(
+                response: 201,
+                description: 'User registered successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(
+                            property: 'data',
+                            properties: [
+                                new OA\Property(property: 'user', type: 'object'),
+                                new OA\Property(property: 'token', type: 'string'),
+                            ]
+                        ),
+                    ]
+                )
+            ),
             new OA\Response(response: 422, description: 'Validation error'),
         ]
     )]
@@ -102,7 +118,50 @@ class UserAuthOpenApiDocs
         ),
         tags: ['Authentication'],
         responses: [
-            new OA\Response(response: 200, description: 'User successfully logged in'),
+            new OA\Response(
+                response: 200,
+                description: 'User successfully logged in or 2FA challenge required',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(
+                            property: 'data',
+                            oneOf: [
+                                new OA\Schema(
+                                    description: 'Direct login response',
+                                    properties: [
+                                        new OA\Property(property: 'token', type: 'string'),
+                                        new OA\Property(property: 'token_type', type: 'string', example: 'Bearer'),
+                                    ]
+                                ),
+                                new OA\Schema(
+                                    description: 'Two-factor challenge response',
+                                    properties: [
+                                        new OA\Property(
+                                            property: 'two_factor_required',
+                                            type: 'boolean',
+                                            example: true
+                                        ),
+                                        new OA\Property(
+                                            property: 'method',
+                                            type: 'string',
+                                            description: 'Configured factor type'
+                                        ),
+                                        new OA\Property(property: 'factor_id', type: 'integer'),
+                                        new OA\Property(
+                                            property: 'factors',
+                                            type: 'array',
+                                            items: new OA\Items(type: 'object')
+                                        ),
+                                        new OA\Property(property: 'two_factor_token', type: 'string'),
+                                    ]
+                                ),
+                            ]
+                        ),
+                    ]
+                )
+            ),
             new OA\Response(response: 401, description: 'Invalid credentials'),
             new OA\Response(response: 500, description: 'Server error'),
         ]
@@ -391,6 +450,9 @@ class UserAuthOpenApiDocs
     #[OA\Post(
         path: '/passkeys/login',
         summary: 'Authenticate using a passkey',
+        description: 'Accounts with two-factor authentication enabled receive a pending challenge instead of an access '
+            . 'token. Complete it through /2fa/verify or /2fa/verify-link. Passkey sign-in preserves the configured '
+            . 'second-factor policy even when WebAuthn user verification succeeds.',
         security: [],
         requestBody: new OA\RequestBody(
             required: true,
@@ -415,6 +477,15 @@ class UserAuthOpenApiDocs
                         new OA\Property(
                             property: 'data',
                             properties: [
+                                new OA\Property(property: 'two_factor_required', type: 'boolean'),
+                                new OA\Property(property: 'method', type: 'string'),
+                                new OA\Property(property: 'factor_id', type: 'integer'),
+                                new OA\Property(
+                                    property: 'factors',
+                                    type: 'array',
+                                    items: new OA\Items(type: 'object')
+                                ),
+                                new OA\Property(property: 'two_factor_token', type: 'string'),
                                 new OA\Property(property: 'token', type: 'string'),
                                 new OA\Property(property: 'token_type', type: 'string', example: 'Bearer'),
                                 new OA\Property(property: 'user', type: 'object'),

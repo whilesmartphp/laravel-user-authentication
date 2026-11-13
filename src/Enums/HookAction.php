@@ -7,6 +7,7 @@ namespace Whilesmart\UserAuthentication\Enums;
  */
 enum HookAction: string
 {
+    case VERIFY_TWO_FACTOR = 'verifyTwoFactor';
     case REGISTER = 'register';
     case LOGIN = 'login';
     case LOGOUT = 'logout';

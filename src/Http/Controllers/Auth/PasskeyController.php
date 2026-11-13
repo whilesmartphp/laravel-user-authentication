@@ -14,7 +14,6 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
 use Webauthn\Exception\InvalidDataException;
 use Whilesmart\UserAuthentication\Enums\HookAction;
-use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Http\Controllers\Controller;
 use Whilesmart\UserAuthentication\Models\Passkey;
 use Whilesmart\UserAuthentication\Rules\EmailDomainRestriction;
@@ -22,12 +21,14 @@ use Whilesmart\UserAuthentication\Services\PasskeyService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
+use Whilesmart\UserAuthentication\Traits\SignsInUsers;
 
 class PasskeyController extends Controller
 {
     use ApiResponse;
     use HasMiddlewareHooks;
     use Loggable;
+    use SignsInUsers;
 
 
     private PasskeyService $passkeyService;
@@ -160,15 +161,7 @@ class PasskeyController extends Controller
 
             return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
         }
-        UserLoggedInEvent::dispatch($user);
-
-        $response = $this->success([
-            'token' => $user->createToken('auth-token')->plainTextToken,
-            'token_type' => 'Bearer',
-            'user' => $user,
-        ], 'User successfully logged in', 200);
-
-        return $this->runAfterHooks($request, $response, HookAction::PASSKEY_LOGIN);
+        return $this->signIn($request, $user, HookAction::PASSKEY_LOGIN);
     }
 
     /**
@@ -272,7 +265,7 @@ class PasskeyController extends Controller
     {
         $request = $this->runBeforeHooks($request, HookAction::PASSKEY_INDEX);
 
-        $passkeys = $request->user()->passkeys
+        $passkeys = $request->user()->passkeys()->get()
             ->makeHidden(['data', 'keyable_type', 'keyable_id']);
         $response = $this->success(data: ['passkeys' => $passkeys], message: __('Passkeys retrieved'));
         return $this->runAfterHooks($request, $response, HookAction::PASSKEY_INDEX);
