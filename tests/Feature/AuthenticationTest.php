@@ -77,6 +77,20 @@ class AuthenticationTest extends TestCase
             ]);
     }
 
+    public function test_login_returns_the_serialized_user_model()
+    {
+        $user = $this->createUser();
+
+        $response = $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+        ])->assertOk();
+
+        $response->assertJsonPath('data.user.created_at', $user->created_at->toJSON())
+            ->assertJsonMissingPath('data.user.password')
+            ->assertJsonMissingPath('data.user.remember_token');
+    }
+
     public function test_api_user_can_login_successfully_with_username()
     {
         $faker = Factory::create();

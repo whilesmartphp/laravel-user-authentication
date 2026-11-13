@@ -21,7 +21,7 @@ class TwoFactorService
 {
     public function userData(Model $user): array
     {
-        return $user->only(['id', 'first_name', 'last_name', 'username', 'email', 'phone', 'email_verified_at']);
+        return $user->makeHidden(['factors', 'recoveryCodes', 'recovery_codes'])->toArray();
     }
 
     public function type(string $key): FactorType

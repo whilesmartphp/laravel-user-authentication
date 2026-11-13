@@ -70,10 +70,8 @@ class TwoFactorVerifyTest extends TwoFactorTestCase
             [$fresh, $freshCode] = $this->sentChallenge($user);
         } while ($freshCode === $code);
         $this->verify($fresh, $code)->assertUnprocessable();
-        $this->assertEqualsCanonicalizing(
-            ['id', 'first_name', 'last_name', 'username', 'email', 'phone', 'email_verified_at'],
-            array_keys($response->json('data.user'))
-        );
+        $response->assertJsonPath('data.user.created_at', $user->created_at->toJSON())
+            ->assertJsonMissingPath('data.user.password');
         $this->postJson('/api/2fa/setup', [], $this->bearer($response->json('data.token')))->assertOk();
     }
 

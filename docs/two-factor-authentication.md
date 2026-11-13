@@ -44,7 +44,7 @@ Send `POST /api/2fa/verify`:
 }
 ```
 
-Use a current TOTP code, the email/SMS code for that pending challenge, or an unused recovery code. A successful response includes an access token with the explicit `2fa-verified` ability and public user identity fields: `id`, `first_name`, `last_name`, `username`, `email`, `phone` and `email_verified_at`. It never includes the factor relationship, secret or recovery codes. Completion dispatches `UserLoggedInEvent` and invokes the original sign-in action's after hooks (`login`, `oauthCallback` or `passkeyLogin`). The completion request uses the `verifyTwoFactor` before hook.
+Use a current TOTP code, the email/SMS code for that pending challenge, or an unused recovery code. A successful response includes an access token with the explicit `2fa-verified` ability and the user model serialized with its `$hidden` attributes removed, as in a sign-in without two factor. It never includes the factor relationship, secret or recovery codes. Completion dispatches `UserLoggedInEvent` and invokes the original sign-in action's after hooks (`login`, `oauthCallback` or `passkeyLogin`). The completion request uses the `verifyTwoFactor` before hook.
 
 For email/SMS, resend with `POST /api/2fa/resend` and `{"two_factor_token":"<opaque-pending-token>","factor_id":1}`. Save the replacement pending token from the response. Earlier codes, links and pending tokens stop working. The same endpoint selects any of the confirmed factors advertised in the pending response. For TOTP it returns a fresh pending token without sending a code.
 
