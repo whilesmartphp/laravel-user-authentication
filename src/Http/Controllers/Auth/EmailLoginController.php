@@ -49,11 +49,21 @@ class EmailLoginController extends Controller
             $url = config('user-authentication.email_login.url');
             $link = $url ? $url . (str_contains($url, '?') ? '&' : '?')
                 . http_build_query(['token' => $delivery['token']]) : null;
-            try {
-                VerificationCodeGeneratedEvent::dispatch($email, $delivery['code'], 'contact_login', 'email', $link);
-            } catch (\Throwable $exception) {
-                report($exception);
-            }
+            $code = $delivery['code'];
+            $sent = false;
+            // Delivery runs after the response is sent so its latency cannot reveal whether the address exists.
+            // Terminating callbacks persist on a reused application, so the flag keeps delivery to one send.
+            app()->terminating(function () use ($email, $code, $link, &$sent) {
+                if ($sent) {
+                    return;
+                }
+                $sent = true;
+                try {
+                    VerificationCodeGeneratedEvent::dispatch($email, $code, 'contact_login', 'email', $link);
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            });
         }
 
         return $this->runAfterHooks(
