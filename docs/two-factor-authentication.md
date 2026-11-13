@@ -1,6 +1,6 @@
 # Two-factor authentication
 
-An access token permits access to your application. A pending two-factor token permits only completion of a specific sign-in challenge. Password login, passkey login, OAuth callbacks and Firebase callbacks return the following data for accounts with two-factor authentication enabled, without an access token:
+An access token grants access to your application. A pending two-factor token identifies one challenge: a sign-in, a factor confirmation or a factor removal. Password login, passkey login, OAuth callbacks and Firebase callbacks return the following data for accounts with two-factor authentication enabled, without an access token:
 
 ```json
 {
@@ -12,7 +12,7 @@ An access token permits access to your application. A pending two-factor token p
 }
 ```
 
-The examples use the default `/api` route prefix. Pending tokens are bound to the account, factor policy, method and purpose. They expire after five minutes by default. Completing or replacing a challenge invalidates its pending token, code and magic link. Only the newest challenge for an account and purpose is valid. Confirming, changing or removing a confirmed factor invalidates outstanding pending tokens. Adding a factor that is not yet confirmed leaves them valid. Pending challenges carry a policy derived from the owner’s confirmed factors; factor changes also invalidate existing policies permanently.
+The examples use the default `/api` route prefix. Pending tokens are bound to the account, factor policy, method and purpose. They expire after five minutes by default. Completing or replacing a challenge invalidates its pending token, code and magic link. Only the newest challenge for an account and purpose is valid. Confirming, changing or removing a confirmed factor invalidates outstanding pending tokens. Adding a factor that is not yet confirmed leaves them valid.
 
 ## TOTP enrollment
 
@@ -21,15 +21,15 @@ The examples use the default `/api` route prefix. Pending tokens are bound to th
 
 Confirmation rejects an already confirmed factor. An owner can register multiple factors, up to `two_factor.max_factors` (five by default), including unconfirmed factors. Only one email and one phone factor per owner is permitted. These limits are enforced under locks on the owner and their factors. Five failed confirmation attempts invalidate setup by default. Confirmation revokes every other access token and marks the current bearer as having completed two-factor authentication. Existing sessions on other devices must sign in again.
 
-The enrollment code's timestep is consumed. Wait for a new authenticator code before using TOTP again. Each accepted timestep is recorded under a database lock, so the same timestep cannot authenticate another challenge or disable two-factor authentication. Recovery codes are case-sensitive, ten-character alphanumeric strings, generated with a cryptographically secure random source and stored individually using Laravel’s salted password hashing. They belong to the owner, independently of factors and APP_KEY rotation. Verification locks unused rows, checks the password hashes, and conditionally marks the matching row used. Used rows remain with `used_at` for auditing.
+Wait for your authenticator app to show a new code after enrollment. Each accepted TOTP time window can be used only once, across sign-in and factor removal. A database lock prevents concurrent reuse. Recovery codes are case-sensitive, ten-character alphanumeric strings, generated with a cryptographically secure random source and stored individually using Laravel’s salted password hashing. They belong to the owner, independently of factors and APP_KEY rotation. Verification locks unused rows, checks the password hashes, and conditionally marks the matching row used. Used rows remain with `used_at` for auditing.
 
-Setup and confirmation require a real Sanctum bearer token. Stateful session authentication alone does not provide a verified bearer, and confirmation requested through a session currently fails with HTTP 500.
+Use a Sanctum bearer token for setup and confirmation. Session authentication alone is not enough; confirmation through a session currently returns HTTP 500.
 
 ## Email and SMS
 
 Send `POST /api/2fa/setup` with `{"type":"email","label":"Work inbox"}` or `{"type":"phone","label":"Mobile"}`. The owner must already have that contact recorded. Setup returns `factor_id` and `two_factor_token` and dispatches a delivery event. Confirm with `factor_id`, that pending token and the delivered `code`. No secret is stored for these types. Changing the account’s delivery contact invalidates its existing pending challenges.
 
-Listen to `VerificationCodeGeneratedEvent` to deliver the code and optional magic link. These two-factor codes are generated and stored locally even when SmartPings handles other package verification flows. Contact-only provider verification cannot prove possession of a specific pending challenge. Do not log event payloads, codes, pending tokens or magic-link URLs.
+Listen to `VerificationCodeGeneratedEvent` to deliver the code and optional magic link. These two-factor codes are generated and stored locally even when SmartPings handles other package verification flows. Verifying an email address or phone number alone does not complete a pending two-factor challenge. Do not log event payloads, codes, pending tokens or magic-link URLs.
 
 Codes use `verification.code_length`, clamped to 4 through 8 digits (six by default). They are stored as hashes on the account's pending challenge, independently of registration and password-reset verification codes.
 
@@ -44,7 +44,7 @@ Send `POST /api/2fa/verify`:
 }
 ```
 
-Use a current TOTP code, the email/SMS code for that pending challenge, or an unused recovery code. A successful response includes an access token with the explicit `2fa-verified` ability and the user model serialized with its `$hidden` attributes removed, as in a sign-in without two factor. It never includes the factor relationship, secret or recovery codes. Completion dispatches `UserLoggedInEvent` and invokes the original sign-in action's after hooks (`login`, `oauthCallback` or `passkeyLogin`). The completion request uses the `verifyTwoFactor` before hook.
+Use a current TOTP code, the email/SMS code for that pending challenge, or an unused recovery code. A successful response includes an access token with the `2fa-verified` ability and the user's data. Attributes listed in `$hidden` are omitted, as in a sign-in without two-factor authentication. It never includes the factor relationship, secret or recovery codes. Completion dispatches `UserLoggedInEvent` and invokes the original sign-in action's after hooks (`login`, `oauthCallback` or `passkeyLogin`). The completion request uses the `verifyTwoFactor` before hook.
 
 For email/SMS, resend with `POST /api/2fa/resend` and `{"two_factor_token":"<opaque-pending-token>","factor_id":1}`. Save the replacement pending token from the response. Earlier codes, links and pending tokens stop working. The same endpoint selects any of the confirmed factors advertised in the pending response. For TOTP it returns a fresh pending token without sending a code.
 
@@ -61,11 +61,11 @@ After the user confirms, the frontend sends `POST /api/2fa/verify-link`:
 }
 ```
 
-Both values must belong to the same pending login. Consumption is atomic and single use. Links cannot satisfy TOTP. Changing the factor policy, replacing the challenge or completing it by code invalidates the link. The link shares the pending challenge's expiry and attempt budget. Remove query parameters from browser history after reading them; avoid analytics and third-party resources on the confirmation page.
+Both values must belong to the same sign-in challenge. Each link works once, even when requests arrive together. A magic link cannot replace a TOTP code. Changing the factor policy, replacing the challenge or completing it by code invalidates the link. The link shares the pending challenge's expiry and attempt budget. Remove query parameters from browser history after reading them; avoid analytics and third-party resources on the confirmation page.
 
 ## Disable
 
-Send an authenticated `POST /api/2fa/disable` with `factor_id`, using a bearer that explicitly completed two-factor authentication.
+Send `POST /api/2fa/disable` with `factor_id` and an access token that has the `2fa-verified` ability.
 
 For TOTP, submit a fresh TOTP code or unused recovery code in `code`. An access token alone never permits disabling, including when recovery codes are exhausted.
 
@@ -116,4 +116,4 @@ use Whilesmart\UserAuthentication\Models\AuthChallenge;
 Schedule::command('model:prune', ['--model' => [AuthChallenge::class]])->daily();
 ```
 
-Pruning removes challenges after `expires_at` plus `two_factor.challenge_retention_hours` (24 hours by default), including consumed challenges. `expires_at` is indexed and is the later of `code_expires_at` and `link_expires_at`. The nullable owner and factor, binding key and separate expiries also support authentication challenges outside two-factor sign-in without another schema change.
+Pruning removes challenges after `expires_at` plus `two_factor.challenge_retention_hours` (24 hours by default), including consumed challenges. `expires_at` is indexed and is the later of `code_expires_at` and `link_expires_at`.
