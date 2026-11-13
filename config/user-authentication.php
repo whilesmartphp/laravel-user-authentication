@@ -39,6 +39,22 @@ return [
         'secret_id' => env('SMARTPINGS_SECRET_ID'),
     ],
 
+    'email_login' => [
+        'enabled' => env('USER_AUTH_EMAIL_LOGIN_ENABLED', false),
+        'create_users' => env('USER_AUTH_EMAIL_LOGIN_CREATE_USERS', false),
+        'url' => env('USER_AUTH_EMAIL_LOGIN_URL'),
+        'code_expiry_minutes' => env('USER_AUTH_EMAIL_LOGIN_CODE_EXPIRY_MINUTES', 10),
+        'link_expiry_minutes' => env('USER_AUTH_EMAIL_LOGIN_LINK_EXPIRY_MINUTES', 15),
+        'attempts' => env('USER_AUTH_EMAIL_LOGIN_ATTEMPTS', 5),
+        'rate_limits' => [
+            'minutes' => env('USER_AUTH_EMAIL_LOGIN_RATE_MINUTES', 1),
+            'issue_ip' => env('USER_AUTH_EMAIL_LOGIN_ISSUE_IP_LIMIT', 10),
+            'issue_email' => env('USER_AUTH_EMAIL_LOGIN_ISSUE_EMAIL_LIMIT', 3),
+            'verify_ip' => env('USER_AUTH_EMAIL_LOGIN_VERIFY_IP_LIMIT', 20),
+            'verify_email' => env('USER_AUTH_EMAIL_LOGIN_VERIFY_EMAIL_LIMIT', 5),
+        ],
+    ],
+
     'two_factor' => [
         'max_factors' => env('USER_AUTH_2FA_MAX_FACTORS', 5),
         'challenge_retention_hours' => env('USER_AUTH_2FA_CHALLENGE_RETENTION_HOURS', 24),

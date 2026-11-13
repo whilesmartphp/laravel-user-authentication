@@ -19,6 +19,59 @@ use OpenApi\Attributes as OA;
 class UserAuthOpenApiDocs
 {
     #[OA\Post(
+        path: '/login/email',
+        summary: 'Request passwordless email sign-in',
+        description: 'Disabled by default. Returns an identical 202 for known and unknown addresses. '
+            . 'Dispatches contact_login verification delivery for eligible addresses only.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email'],
+                properties: [new OA\Property(property: 'email', type: 'string', format: 'email')]
+            )
+        ),
+        tags: ['Authentication'],
+        responses: [
+            new OA\Response(response: 202, description: 'Request accepted without disclosing account existence'),
+            new OA\Response(response: 404, description: 'Email sign-in disabled'),
+            new OA\Response(response: 422, description: 'Invalid email'),
+            new OA\Response(response: 429, description: 'IP or email limit exceeded'),
+        ]
+    )]
+    public function requestEmailLogin()
+    {
+    }
+
+    #[OA\Post(
+        path: '/login/email/verify',
+        summary: 'Consume an email sign-in code or link token',
+        description: 'POST only. Verifies email, optionally creates an account, and returns a bearer token '
+            . 'with public user fields or a pending two-factor challenge. Both credentials are consumed together.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(oneOf: [
+                new OA\Schema(required: ['email', 'code'], properties: [
+                    new OA\Property(property: 'email', type: 'string', format: 'email'),
+                    new OA\Property(property: 'code', type: 'string', pattern: '^[0-9]{6}$'),
+                ]),
+                new OA\Schema(required: ['token'], properties: [
+                    new OA\Property(property: 'token', type: 'string', pattern: '^[a-zA-Z0-9]{64}$'),
+                ]),
+            ])
+        ),
+        tags: ['Authentication'],
+        responses: [
+            new OA\Response(response: 200, description: 'Authenticated or second factor required'),
+            new OA\Response(response: 404, description: 'Email sign-in disabled'),
+            new OA\Response(response: 422, description: 'Invalid, expired, consumed, or exhausted challenge'),
+            new OA\Response(response: 429, description: 'IP or email limit exceeded'),
+        ]
+    )]
+    public function verifyEmailLogin()
+    {
+    }
+
+    #[OA\Post(
         path: '/oauth/firebase/{driver}/callback',
         summary: 'Handles Firebase Oauth login callback',
         requestBody: new OA\RequestBody(

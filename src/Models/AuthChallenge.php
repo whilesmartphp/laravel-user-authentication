@@ -10,9 +10,10 @@ use Illuminate\Database\Eloquent\Prunable;
  * @property string|null $authenticatable_type
  * @property int|null $authenticatable_id
  * @property string $id
+ * @property int|null $factor_id
+ * @property string|null $binding_key
  * @property \Illuminate\Support\Carbon|null $code_expires_at
  * @property \Illuminate\Support\Carbon|null $link_expires_at
- * @property int|null $factor_id
  * @property string $token_hash
  * @property string $purpose
  * @property string $method

@@ -10,6 +10,8 @@ enum HookAction: string
     case VERIFY_TWO_FACTOR = 'verifyTwoFactor';
     case REGISTER = 'register';
     case LOGIN = 'login';
+    case EMAIL_LOGIN_REQUEST = 'emailLoginRequest';
+    case EMAIL_LOGIN_VERIFY = 'emailLoginVerify';
     case LOGOUT = 'logout';
     case OAUTH_LOGIN = 'oauthLogin';
     case OAUTH_CALLBACK = 'oauthCallback';
