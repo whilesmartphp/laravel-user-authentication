@@ -50,14 +50,14 @@ class TwoFactorController extends Controller
 
     public function confirm(Request $request)
     {
+        if ($this->requiresBearer($request)) {
+            return $this->failure('Two-factor setup requires a bearer token.', 403);
+        }
         $request->validate([
             'factor_id' => 'required|integer',
             ...$this->rules(false),
             'code' => ['required', 'string', 'regex:/\A[0-9]{4,8}\z/'],
         ]);
-        if ($this->requiresBearer($request)) {
-            return $this->failure('Two-factor setup requires a bearer token.', 403);
-        }
         $user = $request->user();
         /** @var PersonalAccessToken $current */
         $current = $user->currentAccessToken();

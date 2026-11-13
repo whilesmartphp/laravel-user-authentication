@@ -33,6 +33,7 @@ class TwoFactorAuthenticationTest extends TwoFactorTestCase
     {
         $user = $this->createUser();
         $this->actingAs($user, 'web')->postJson('/api/2fa/setup')->assertForbidden();
+        $this->actingAs($user, 'web')->postJson('/api/2fa/confirm')->assertForbidden();
         $this->assertSame(0, $user->factors()->count());
         $token = $this->passwordLogin($user)->assertOk()->json('data.token');
         $secret = $this->postJson('/api/2fa/setup', [], $this->bearer($token))->assertOk()->json('data.secret');
