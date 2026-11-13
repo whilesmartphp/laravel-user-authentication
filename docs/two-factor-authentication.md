@@ -1,6 +1,6 @@
 # Two-factor authentication
 
-An access token grants access to your application. A pending two-factor token identifies one challenge: a sign-in, a factor confirmation or a factor removal. Password login, passkey login, OAuth callbacks and Firebase callbacks return the following data for accounts with two-factor authentication enabled, without an access token:
+An access token grants access to your application. A pending two-factor token identifies one challenge: a sign-in, a factor confirmation or a factor removal. Password login, email sign-in, passkey login, OAuth callbacks and Firebase callbacks return the following data for accounts with two-factor authentication enabled, without an access token:
 
 ```json
 {

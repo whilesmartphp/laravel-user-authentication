@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Whilesmart\UserAuthentication\Http\Controllers\Auth\AuthController;
+use Whilesmart\UserAuthentication\Http\Controllers\Auth\EmailLoginController;
 use Whilesmart\UserAuthentication\Http\Controllers\Auth\PasskeyController;
 use Whilesmart\UserAuthentication\Http\Controllers\Auth\PasswordResetController;
 use Whilesmart\UserAuthentication\Http\Controllers\Auth\TwoFactorController;
@@ -47,3 +48,6 @@ Route::group(['middleware' => ['auth:sanctum', 'two-factor']], function () {
 Route::post('/2fa/verify', [TwoFactorController::class, 'verify'])->middleware('throttle:two-factor-verify');
 Route::post('/2fa/resend', [TwoFactorController::class, 'resend'])->middleware('throttle:two-factor-resend');
 Route::post('/2fa/verify-link', [TwoFactorController::class, 'verifyLink'])->middleware('throttle:two-factor-link');
+
+Route::post('/login/email', [EmailLoginController::class, 'issue'])->middleware('throttle:email-login-issue');
+Route::post('/login/email/verify', [EmailLoginController::class, 'verify'])->middleware('throttle:email-login-verify');

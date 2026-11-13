@@ -14,6 +14,7 @@ Authentication endpoints for Laravel APIs. Users register and sign in with a pas
 | Area | Included |
 | --- | --- |
 | Accounts | Registration, login by email, phone or username, logout, password reset by code |
+| Email sign-in | Optional passwordless sign-in with an emailed code or magic link |
 | Social sign-in | Socialite drivers (Google, Apple and others) and Firebase ID tokens |
 | Passkeys | WebAuthn registration and login, with optional discoverable credentials |
 | Two-factor | TOTP apps, email and SMS codes, magic links, recovery codes, several labeled factors per user |
@@ -87,6 +88,9 @@ Most settings read an environment variable. The ones most installs touch:
 | `USER_AUTH_VERIFICATION_PROVIDER` | `default` | `default` or `smartpings` |
 | `USER_AUTH_SELF_MANAGED` | `true` | Set to `false` to let SmartPings send and check codes |
 | `USER_AUTH_MAGIC_LINK_URL` | none | Frontend page that receives two-factor magic links |
+| `USER_AUTH_EMAIL_LOGIN_ENABLED` | `false` | Turn on passwordless email sign-in |
+| `USER_AUTH_EMAIL_LOGIN_CREATE_USERS` | `false` | Create an account for an unknown email on sign-in |
+| `USER_AUTH_EMAIL_LOGIN_URL` | none | Frontend page that receives email sign-in links |
 | `USER_AUTH_PASSKEY_DOMAIN` | none | Domain that identifies your app to passkeys, as a hostname or URL |
 | `USER_AUTH_PASSKEY_ALLOWED_ORIGINS` | none | Frontend origins allowed to register and use passkeys |
 
@@ -124,6 +128,8 @@ All paths use the default `/api` prefix.
 | --- | --- | --- |
 | `POST` | `/register` | |
 | `POST` | `/login` | Email, phone or username with a password |
+| `POST` | `/login/email` | Sends a code, plus a link when a URL is set; returns 202 |
+| `POST` | `/login/email/verify` | `{email, code}` or `{token}` |
 | `POST` | `/logout` | Signed in |
 | `POST` | `/send-verification-code` | |
 | `POST` | `/verify-code` | |
@@ -183,6 +189,7 @@ This creates `app/Http/Documentation/UserAuthOpenApiDocs.php`.
 | --- | --- |
 | [Installation](docs/installation.md) | Setup and publishing |
 | [Verification](docs/verification.md) | Email and phone verification with your provider or SmartPings |
+| [Email sign-in](docs/email-login.md) | Codes, links, account creation and delivery events |
 | [Passkeys](docs/passkey.md) | WebAuthn settings and troubleshooting |
 | [Two-factor authentication](docs/two-factor-authentication.md) | Factors, challenges, magic links, recovery codes |
 | [Customization](docs/customization.md) | Response format, middleware hooks |

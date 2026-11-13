@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Whilesmart\UserAuthentication\Interfaces\ResponseFormatterInterface;
+use Whilesmart\UserAuthentication\Services\ContactLoginService;
 use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
 use Whilesmart\UserAuthentication\Services\TwoFactorService;
 
@@ -53,6 +54,7 @@ class UserAuthenticationServiceProvider extends ServiceProvider
     {
         $this->registerTwoFactorLimiters();
         $this->registerPasskeyLimiters();
+        $this->registerEmailLoginLimiters();
         $this->registerRoutes();
         $this->registerPublishing();
         $this->app['router']->aliasMiddleware(
@@ -98,6 +100,7 @@ class UserAuthenticationServiceProvider extends ServiceProvider
                     $limits[] = Limit::perMinute((int) config('user-authentication.passkey.rate_limits.email'))
                         ->by($action . ':email:' . hash('sha256', strtolower(trim($email))));
                 }
+
                 return $limits;
             });
         }
@@ -149,6 +152,29 @@ class UserAuthenticationServiceProvider extends ServiceProvider
             }
             Route::prefix(config('user-authentication.route_prefix', 'api') ?: '')->group(function () use ($file) {
                 $this->loadRoutesFrom(__DIR__ . '/../routes/' . $file . '.php');
+            });
+        }
+    }
+
+    private function registerEmailLoginLimiters(): void
+    {
+        foreach (['issue', 'verify'] as $operation) {
+            RateLimiter::for('email-login-' . $operation, function (Request $request) use ($operation) {
+                $email = $request->input('email');
+                $token = $request->input('token');
+                if ($operation === 'verify' && is_string($token) && strlen($token) === 64) {
+                    $email = app(ContactLoginService::class)->contactForToken($token);
+                }
+                $account = is_string($email) ? strtolower(trim($email)) : 'invalid';
+                $limits = config('user-authentication.email_login.rate_limits');
+                $minutes = max(1, (int) $limits['minutes']);
+
+                return [
+                    Limit::perMinutes($minutes, max(1, (int) $limits[$operation . '_ip']))
+                        ->by('email-login:' . $operation . ':ip:' . $request->ip()),
+                    Limit::perMinutes($minutes, max(1, (int) $limits[$operation . '_email']))
+                        ->by('email-login:' . $operation . ':email:' . hash('sha256', $account)),
+                ];
             });
         }
     }

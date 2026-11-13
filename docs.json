@@ -10,6 +10,7 @@
   "sidebar": [
     { "title": "Installation", "path": "docs/installation.md" },
     { "title": "Verification", "path": "docs/verification.md" },
+    { "title": "Email sign-in", "path": "docs/email-login.md" },
     { "title": "Passkeys", "path": "docs/passkey.md" },
     { "title": "Two-factor authentication", "path": "docs/two-factor-authentication.md" },
     { "title": "Customization", "path": "docs/customization.md" }
