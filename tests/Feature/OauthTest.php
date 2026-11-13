@@ -14,6 +14,7 @@ use Whilesmart\UserAuthentication\Models\OauthAccount;
 use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Tests\TestCase;
 
+#[WithMigration]
 class OauthTest extends TestCase
 {
     protected function defineEnvironment($app)
@@ -63,6 +64,7 @@ class OauthTest extends TestCase
 
     public function test_oauth_callback_creates_new_user_and_oauth_account()
     {
+        $this->withoutExceptionHandling();
         Event::fake();
 
         $socialiteUser = $this->mockSocialiteUser([
@@ -278,4 +280,23 @@ class OauthTest extends TestCase
 
         $this->assertEquals(1, OauthAccount::where('user_id', $user->id)->where('provider', 'github')->count());
     }
+    public function test_oauth_for_two_factor_user_returns_pending_without_minting_token()
+    {
+        $user = $this->createUser(['email' => 'test@example.com']);
+        $user->factors()->create([
+            'type' => 'totp', 'confirmed_at' => now(),
+            'secret' => app('pragmarx.google2fa')->generateSecretKey(),
+        ]);
+        $this->mockSocialiteDriver($this->mockSocialiteUser(['email' => $user->email]));
+        Event::fake([UserLoggedInEvent::class]);
+        $pending = $this->getJson('/api/oauth/github/callback')->assertOk()
+            ->assertJsonPath('data.two_factor_required', true)
+            ->assertJsonMissingPath('data.token')->json('data.two_factor_token');
+        $this->assertSame(0, $user->tokens()->count());
+        Event::assertNotDispatched(UserLoggedInEvent::class);
+        $code = app('pragmarx.google2fa')->getCurrentOtp($user->fresh()->factors()->first()->secret);
+        $this->postJson('/api/2fa/verify', ['two_factor_token' => $pending, 'code' => $code])->assertOk();
+        Event::assertDispatchedTimes(UserLoggedInEvent::class, 1);
+    }
+
 }

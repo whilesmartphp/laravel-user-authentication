@@ -39,6 +39,32 @@ return [
         'secret_id' => env('SMARTPINGS_SECRET_ID'),
     ],
 
+    'two_factor' => [
+        'max_factors' => env('USER_AUTH_2FA_MAX_FACTORS', 5),
+        'challenge_retention_hours' => env('USER_AUTH_2FA_CHALLENGE_RETENTION_HOURS', 24),
+        'types' => [
+            'totp' => \Whilesmart\UserAuthentication\FactorTypes\TotpFactorType::class,
+            'email' => \Whilesmart\UserAuthentication\FactorTypes\EmailFactorType::class,
+            'phone' => \Whilesmart\UserAuthentication\FactorTypes\PhoneFactorType::class,
+        ],
+        'attempts' => env('USER_AUTH_2FA_ATTEMPTS', 5),
+        'expiry_minutes' => env('USER_AUTH_2FA_EXPIRY_MINUTES', 5),
+        'rate_limits' => [
+            'minutes' => env('USER_AUTH_2FA_RATE_MINUTES', 1),
+            'verify' => env('USER_AUTH_2FA_VERIFY_LIMIT', 5),
+            'resend' => env('USER_AUTH_2FA_RESEND_LIMIT', 3),
+            'link' => env('USER_AUTH_2FA_LINK_LIMIT', 5),
+            'setup' => env('USER_AUTH_2FA_SETUP_LIMIT', 5),
+            'confirm' => env('USER_AUTH_2FA_CONFIRM_LIMIT', 5),
+            'disable' => env('USER_AUTH_2FA_DISABLE_LIMIT', 5),
+        ],
+    ],
+
+    // Magic link configuration for two-factor authentication
+    'magic_link' => [
+        'url' => env('USER_AUTH_MAGIC_LINK_URL'),
+    ],
+
     /*
     | Email Domain Restrictions
     | Mode: 'whitelist', 'blacklist', or null to allow all emails

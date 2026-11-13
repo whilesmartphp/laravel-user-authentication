@@ -22,15 +22,17 @@ This package supports WebAuthn passkeys for passwordless and standalone sign-in.
 
 Passkeys in this package are stored as WebAuthn credentials linked to the package's user model through a polymorphic relation. Each user can have multiple passkeys (e.g., one on their laptop, one on their phone).
 
-If you configure a custom user model via `user-authentication.user_model`, the model must use the `Whilesmart\UserAuthentication\Traits\HasPasskeys` trait so the passkey relation is available:
+If you configure a custom user model via `user-authentication.user_model`, the model must use the `HasPasskeys` and `HasTwoFactorAuth` traits for passkey storage and sign-in policy enforcement:
 
 ```php
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Whilesmart\UserAuthentication\Traits\HasPasskeys;
+use Whilesmart\UserAuthentication\Traits\HasTwoFactorAuth;
 
 class User extends Authenticatable
 {
     use HasPasskeys;
+    use HasTwoFactorAuth;
 }
 ```
 
@@ -39,6 +41,8 @@ Key features:
 - **Configurable resident credentials**: opt-in to discoverable credentials for true passwordless login, or keep them off for second-factor-only use.
 - **Email-based passkey login**: the backend filters the allowed credentials to those belonging to a specific user.
 - **Passwordless passkey login**: when resident keys are enabled, the backend returns an empty `allowCredentials` list, letting the browser show the passkey picker.
+
+Passkey sign-in preserves the account's configured second factor. When enabled, login returns `two_factor_required`, `method`, and `two_factor_token` instead of an access token. Submit the pending token and factor to `/2fa/verify`, or redeem the email/SMS link through `/2fa/verify-link`. Passkey management requires a bearer token that has completed two-factor authentication.
 
 ## Requirements
 

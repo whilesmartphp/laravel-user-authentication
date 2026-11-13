@@ -1,83 +1,299 @@
-# AGENTS.md — whilesmart/laravel-user-authentication
+# Laravel User Authentication Package
 
-This is a **Laravel package** (not a standalone app). Tests use **Orchestra Testbench**.
+## Project Overview
 
-## Quick commands
+This is `whilesmart/laravel-user-authentication`, a Laravel package maintained by **WhileSmart** for managing user authentication across PHP projects. It provides API-first authentication endpoints for registration, login, logout, password reset, OAuth (Google, Apple, etc. via Socialite and Firebase), email/phone verification, and two-factor authentication (TOTP and magic links), and passkeys (WebAuthn).
 
-| Command | What it does |
-|---------|-------------|
-| `composer test` | Run all tests with coverage |
-| `composer pint` | Format code (PSR-12 preset — **not** the Laravel preset) |
-| `composer pint:test` | Check formatting only |
-| `composer phpstan` | Static analysis, level 5 (`src/`, 2048M memory) |
-| `composer phpmd` | Mess detection on `src/` |
-| `composer phpcs:test` | PHPCS check on `src/` |
-| `composer openapi` | Generate `docs/api.json` from PHP attributes |
-| `composer serve` | Build workbench + start dev server |
+- **Package name:** `whilesmart/laravel-user-authentication`
+- **Current version:** `1.0.5`
+- **License:** MIT
+- **PHP requirement:** `^8.3`
+- **Primary language:** English (code, comments, and documentation)
 
-**Lint pipeline order:** `pint:test` → `phpcs:test` → `phpstan` → `phpmd`
+The package is intended to be installed into a Laravel application via Composer. It auto-registers its service provider, routes, migrations, and translations.
 
-## Docker dev (alternative to direct composer)
+## Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Language | PHP 8.3+ |
+| Framework | Laravel (package built with Orchestra Testbench) |
+| API Authentication | Laravel Sanctum |
+| OAuth | Laravel Socialite + Kreait Laravel Firebase |
+| 2FA | PragmaRX Google2FA Laravel |
+| Passkeys | web-auth/webauthn-lib |
+| Managed Verification | SmartPings PHP SDK (`smartpings/php-sdk`) |
+| Testing | PHPUnit + Orchestra Testbench |
+| Code Style | Laravel Pint (PSR-12 preset), PHP_CodeSniffer |
+| Static Analysis | PHPStan level 5 + Larastan |
+| Mess Detection | PHPMD |
+| Documentation | OpenAPI (Swagger PHP attributes) |
+| Local Runtime | Docker Compose (PHP 8.3 CLI + MySQL 8.0) |
+
+## Directory Structure
+
+```
+config/                         Package configuration
+  user-authentication.php       Main config file (env-driven)
+database/migrations/            Package migrations
+docs/                           Markdown guides for consumers
+  installation.md
+  verification.md
+  customization.md
+lang/en/                        Translation files
+routes/                         Route definitions
+  user-authentication.php       Core auth + 2FA routes
+  social-login.php              OAuth routes
+src/                            Package source (PSR-4: Whilesmart\UserAuthentication\)
+  Documentation/                OpenAPI docs class
+  Enums/                        HookAction enum
+  Events/                       Laravel events dispatched by the package
+  Http/Controllers/Auth/        Auth, PasswordReset, TwoFactor, Passkey controllers
+  Http/Middleware/              two-factor middleware
+  Interfaces/                   ResponseFormatterInterface, MiddlewareHookInterface
+  Models/                       User, VerificationCode, OauthAccount, AuthFactor, AuthChallenge, RecoveryCode, Passkey
+  ResponseFormatters/           Default JSON response formatter
+  Rules/                        EmailDomainRestriction validation rule
+  Services/                     SmartPingsVerificationService, TwoFactorService, PasskeyService
+  Traits/                       ApiResponse, HasMiddlewareHooks, HasTwoFactorAuth, HasPasskeys, Loggable
+  UserAuthenticationServiceProvider.php
+tests/                          PHPUnit feature tests
+  Feature/                      One test class per feature area
+  TestCase.php                  Base Orchestra Testbench test case
+workbench/                      Orchestra Testbench workbench app
+  app/Models/User.php
+  database/migrations/          Sanctum + OAuth migration stubs for tests
+demo/                           React + Vite demo frontend (see note below)
+```
+
+## Code Organization
+
+- **Controllers** live in `src/Http/Controllers/Auth/` and extend `Illuminate\Routing\Controller`. They use the `ApiResponse`, `HasMiddlewareHooks`, and `Loggable` traits.
+- **Models** are in `src/Models/`. The default `User` model extends `Authenticatable`, uses Sanctum, and includes the `HasTwoFactorAuth` and `HasPasskeys` traits. Consumers can override the user model via `config('user-authentication.user_model')`.
+- **Services** encapsulate verification and 2FA logic:
+  - `SmartPingsVerificationService` delegates sending/verifying codes to SmartPings when enabled.
+  - `PasskeyService` handles WebAuthn registration and authentication.
+  - `TwoFactorService` handles TOTP, email/SMS challenges, and magic-link generation.
+- **Events** provide extensibility hooks: `UserRegisteredEvent`, `UserLoggedInEvent`, `UserLoggedOutEvent`, `VerificationCodeGeneratedEvent`, `PasswordResetCodeGeneratedEvent`, `PasswordResetCompleteEvent`, `OauthUserAuthenticatedEvent`.
+- **Traits**:
+  - `ApiResponse` delegates response formatting to the configured formatter.
+  - `HasMiddlewareHooks` runs configurable `before`/`after` hooks around controller actions.
+  - `HasTwoFactorAuth` adds the polymorphic `factors` and `recoveryCodes` relations and the `hasTwoFactorEnabled()` helper.
+- **Interfaces** allow customization:
+  - `ResponseFormatterInterface` for custom API response shapes.
+  - `MiddlewareHookInterface` for injecting request/response hooks.
+
+## Routes
+
+Routes are prefixed with `config('user-authentication.route_prefix')` (default: `api`).
+
+Core routes (`routes/user-authentication.php`):
+- `POST /register`
+- `POST /login`
+- `POST /logout` (auth:sanctum, two-factor)
+- `POST /send-verification-code`
+- `POST /verify-code`
+- `POST /password/reset-code`
+- `POST /password/reset`
+- `GET /2fa/factors` (auth:sanctum, two-factor)
+- `POST /2fa/recovery-codes` (auth:sanctum, two-factor, throttled)
+- `POST /2fa/setup` (auth:sanctum, two-factor, throttled)
+- `POST /2fa/confirm` (auth:sanctum, two-factor, throttled)
+- `POST /2fa/disable` (auth:sanctum, two-factor, throttled)
+- `POST /2fa/verify` (throttled)
+- `POST /2fa/resend` (throttled)
+- `POST /2fa/verify-link` (throttled)
+- `POST /passkeys/login/options` (throttled)
+- `POST /passkeys/login` (throttled)
+- `POST /passkeys/register/options` (auth:sanctum, two-factor, throttled)
+- `POST /passkeys/register` (auth:sanctum, two-factor, throttled)
+- `GET /passkeys` (auth:sanctum, two-factor)
+- `DELETE /passkeys/{id}` (auth:sanctum, two-factor)
+
+OAuth routes (`routes/social-login.php`):
+- `GET /oauth/{driver}/login`
+- `GET|POST /oauth/{driver}/callback`
+- `POST /oauth/firebase/{driver}/callback`
+
+## Passkeys
+
+- `PasskeyController`, `PasskeyService`, `Passkey`, and `HasPasskeys` implement passkey support.
+- `tests/TestCase.php` provides `createPasskey()` alongside `createUser()`.
+- Passkey ceremony sessions are stored in cache with a configurable lifetime.
+- `USER_AUTH_PASSKEY_ALLOWED_ORIGINS` contains the full frontend origins.
+- `USER_AUTH_PASSKEY_DOMAIN` accepts a full URL or a bare hostname.
+- Resident keys are opt-in through `USER_AUTH_PASSKEY_RESIDENT_KEYS` and enable login without email.
+- Passkey login uses the same second-factor enforcement as password, OAuth, and Firebase login.
+- Passkey documentation is in `docs/passkey.md`; tests cover both feature and service behavior.
+
+## Configuration
+
+The main config file is `config/user-authentication.php`. Important settings:
+
+- `user_model`: override the default user model.
+- `route_prefix`: prefix for all package routes (`USER_AUTH_ROUTE_PREFIX`).
+- `register_routes` / `register_oauth_routes`: toggle route registration.
+- `response_formatter`: class implementing `ResponseFormatterInterface`.
+- `verification.*`: email/phone verification toggles, code length/expiry, rate limits, provider.
+- `smartpings.*`: SmartPings credentials.
+- `email_restrictions.*`: whitelist/blacklist email domains.
+- `oauth_scopes`: per-provider Socialite scopes.
+- `encrypt_oauth_tokens`: encrypt stored OAuth tokens.
+- `middleware_hooks`: array of hook classes.
+
+Environment variables are documented in `README.md` and start with `USER_AUTH_*` and `SMARTPINGS_*`.
+
+## Build and Test Commands
+
+### Composer scripts (run from repo root)
 
 ```bash
-make up         # docker compose up -d
-make install    # up + composer install
-make test       # test in container
+composer test            # Run PHPUnit tests with coverage via Orchestra Testbench
+composer pint            # Apply Laravel Pint (PSR-12 preset)
+composer pint:test       # Check Laravel Pint formatting without fixing
+composer lint            # Alias for pint (applies fixes)
+composer phpstan         # Run PHPStan level 5 on src/
+composer phpmd           # Run PHPMD on src/
+composer phpcs           # Run PHP CodeBeautifier on src/
+composer phpcs:test      # Run PHP_CodeSniffer on src/
+composer openapi         # Generate docs/api.json from OpenAPI attributes
+composer build           # Build workbench skeleton
+composer serve           # Build and serve the workbench locally
+composer clear           # Purge workbench skeleton
+composer prepare         # Discover package in workbench
+```
+
+### Make commands (Docker)
+
+The project includes a `Makefile` that wraps Docker Compose commands:
+
+```bash
+make fresh      # Down, up, and install dependencies
+make setup      # fresh + test
+make install    # Start containers and run composer install
+make test       # Run tests inside the app container
+make pint       # Run pint inside container
 make lint       # pint + phpcs + phpstan + phpmd
-make shell      # bash in container
-make fresh      # down + up + install
+make build      # Build workbench inside container
+make serve      # Serve workbench inside container
+make up/down/restart/logs/shell  # Docker lifecycle commands
 ```
 
-## Architecture
+Docker Compose (`docker-compose.yml`) defines:
+- `app`: PHP 8.3 CLI container, running `tail -f /dev/null`, with the repo mounted at `/app`.
+- `mysql`: MySQL 8.0 service for local development/testing.
 
-- **Namespace:** `Whilesmart\UserAuthentication\` → `src/`
-- **Test namespace:** `Whilesmart\UserAuthentication\Tests\` → `tests/`
-- **Service provider:** `UserAuthenticationServiceProvider` — auto-loads routes, migrations, translations, publishes config/docs/controllers
-- **Routes auto-register** under `USER_AUTH_ROUTE_PREFIX` (default: `api`). Disable via config keys `register_routes` / `register_oauth_routes`.
-- **Config:** All env-driven with `USER_AUTH_*` prefix, published to `config/user-authentication.php`
-- **Test base class:** `tests/TestCase.php` — extends `Orchestra\Testbench\TestCase`, uses `RefreshDatabase`, loads `SocialiteServiceProvider`, creates users via `createUser()` helper
-- **Key deps:** Sanctum (API tokens), Socialite (OAuth), kreait/laravel-firebase, web-auth/webauthn-lib, smartpings/php-sdk
-- **User model:** `src/Models/User.php` — uses `HasApiTokens`, `HasPasskeys`
+## Testing Strategy
 
-## Package structure
+- **Framework:** PHPUnit through Orchestra Testbench.
+- **Test location:** `tests/Feature/`
+- **Base class:** `Whilesmart\UserAuthentication\Tests\TestCase`
+- **Database:** Tests use a SQLite file at `database/database.sqlite` (created on the fly if missing) with `RefreshDatabase`.
+- **Coverage:** The `tests.yml` GitHub Action enforces a minimum code-coverage threshold of **65.8%**.
+- **Test categories:**
+  - `AuthenticationTest`: registration, login (email/phone/username), password reset, verification flows, SmartPings integration.
+  - `VerificationSecurityTest`: rate limiting, expiration, bypass prevention.
+  - `TwoFactorAuthenticationTest`, `TwoFactorMiddlewareTest`, `TwoFactorVerifyTest`: TOTP setup/confirm/disable, middleware interception, recovery codes, magic links.
+  - `OauthTest`: Socialite callback handling and OAuth account linking.
+  - `EmailRestrictionTest`: whitelist/blacklist domain validation.
+  - `LogoutTest`, `MagicLinkTest`.
 
-| Directory | Purpose |
-|-----------|---------|
-| `src/Http/Controllers/Auth/` | `AuthController`, `PasskeyController`, `PasswordResetController` |
-| `src/Models/` | `User`, `VerificationCode`, `OauthAccount`, `Passkey` |
-| `src/Services/` | `SmartPingsVerificationService`, `PasskeyService` |
-| `src/Events/` | 7 events (register, login, logout, verification, password reset, OAuth) |
-| `src/Traits/` | `ApiResponse`, `HasMiddlewareHooks`, `HasPasskeys`, `Loggable` |
-| `config/` | `user-authentication.php` |
-| `routes/` | `user-authentication.php` (auth + passkey), `social-login.php` (OAuth) |
+Run tests locally:
 
-## Key quirks
-
-- **Pint uses PSR-12** (`--preset psr12`), not the default Laravel preset
-- **PHPStan level 5** — run on `src/` only, includes Larastan + Carbon extensions
-- **Tests use SQLite** (Testbench default), but Docker env spins up MySQL
-- **Migrations load from two places:** package's `database/migrations/` and `workbench/database/migrations/` (for test schema)
-- **OAuth callback** supports both GET and POST (`Route::match`)
-- **Firebase OAuth** uses a dedicated endpoint `/oauth/firebase/{driver}/callback`
-- **Passkey session** is stored in cache, configurable lifetime
-- **Passkey origin/rp config** requires `USER_AUTH_PASSKEY_ALLOWED_ORIGINS` set to the full origin(s) where the frontend is served (e.g. `https://app.example.com`). `USER_AUTH_PASSKEY_DOMAIN` must also include the scheme (e.g. `https://app.example.com`) because the backend extracts the host with `parse_url()`; a bare hostname causes `rp.id` to be dropped and an **rpId hash mismatch** during registration
-- **Passkey resident keys** are opt-in via `USER_AUTH_PASSKEY_RESIDENT_KEYS`. Required for passwordless login without email; disabled by default
-- **Email restrictions** support whitelist/blacklist mode via env vars
-
-## Commits
-
-Conventional commit prefixes — short, lowercase, no trailing `.`:
-
-```
-feat:       New feature
-enh:        Enhancement to existing feature
-fix:        Bug fix
-chore:      Tooling, deps, CI, refactors with no behaviour change
-docs:       Documentation only
+```bash
+vendor/bin/testbench package:test
+# or with coverage
+vendor/bin/testbench package:test --coverage
 ```
 
-Use scopes for context when helpful: `feat(oauth):`, `feat(docs):`, `chore(deps):`.
+## Code Style Guidelines
 
-**Capitalize the first word after the colon:** `feat: Add feature`, not `feat: add feature`.
+- **PSR-12** is the canonical style, enforced by Laravel Pint (`composer pint:test`).
+- **PHP_CodeSniffer** (`composer phpcs:test`) provides an additional standards check.
+- **PHPStan** runs at level 5 with Larastan; `phpstan.neon` includes the Larastan and Carbon extensions.
+- **PHPMD** uses `phpmd.xml`, which imports standard rulesets with relaxed thresholds for Laravel-typical patterns.
+- Class/method comments use Laravel-style docblocks.
+- `@codeCoverageIgnore` is used on enum methods and the OpenAPI docs class.
+- `@phpstan-ignore-next-line` is used sparingly where static analysis cannot infer framework behavior.
 
-**Do not commit** unless explicitly asked. Before committing, inspect `git status`, `git diff`, and recent log; stage only intended files.
+## Commit Message Conventions
+
+This project follows [Conventional Commits](https://www.conventionalcommits.org/) with a custom type list. Commit messages are validated by the `commits.yml` GitHub Actions workflow using `@commitlint/config-conventional`.
+
+Format:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+- **Type** (required): One of `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `build`, `ci`, `enh`, `enhance`, `tweak`, `imp`, `improve`.
+- **Scope** (optional): A short name of the affected part of the codebase, e.g., `auth`, `2fa`, `tests`.
+- **Subject** (required): A brief description in sentence-case, starting with a capital letter. Maximum **80 characters**.
+- **Body** (optional): A more detailed explanation of the change.
+- **Footer** (optional): Related issue references, breaking change notes, etc.
+
+Example:
+
+```
+feat(auth): Add TOTP-based two-factor authentication
+
+Introduces the AuthFactor model, HasTwoFactorAuth trait, and
+TwoFactorService to support TOTP setup, verification, and recovery codes.
+
+Refs: #21
+```
+
+For the full shared convention, see [WhileSmart Commit Conventions](https://github.com/whilesmart/conventions/blob/main/commits.md).
+
+## Security Considerations
+
+- **Verification codes** are stored as bcrypt hashes in the `verification_codes` table.
+- **Rate limiting** is applied to password-reset and verification-code endpoints, keyed by both IP and contact.
+- **TOTP secrets** are encrypted at rest via the `encrypted` Eloquent cast.
+- **Recovery codes** are stored one per row as salted password hashes and marked used once redeemed.
+- **OAuth tokens** can be optionally encrypted via `encrypt_oauth_tokens` config.
+- **Magic links** are random single-use tokens stored as SHA-256 hashes, and expire with their challenge.
+- **Email domain restrictions** support whitelist or blacklist modes.
+- **SmartPings** mode delegates verification to an external service; missing credentials throw an exception at service construction.
+- Controllers do not trust frontend flags for verification status; backend state is checked during registration.
+
+## CI/CD and Automation
+
+GitHub Actions workflows are in `.github/workflows/`:
+
+- `tests.yml`: Runs the test suite on PHP 8.3/8.4/8.5 against MySQL 5.7 and enforces coverage.
+- `lint-sniffs.yml`: Runs `phpcs:test`, `phpstan`, `phpmd`, `pint:test`, and verifies OpenAPI generation.
+- `run-tests.yml`: Legacy/test workflow using PHP 8.2 and SQLite.
+- `validate-docs.yml`: Validates documentation using the whilesmart docs-kit action when docs change.
+- `pre-release.yml` / `release.yml`: WhileSmart shared workflows for release management.
+- `commits.yml`: Validates conventional commit messages; allowed types include `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `build`, `ci`, `enh`, `enhance`, `tweak`, `imp`, `improve`. Subject should be sentence-case and header max 80 chars.
+
+## Publishing and Customization
+
+Consumers can publish package assets into their app:
+
+```bash
+php artisan vendor:publish --tag=laravel-user-authentication-config
+php artisan vendor:publish --tag=laravel-user-authentication-migrations
+php artisan vendor:publish --tag=laravel-user-authentication-routes
+php artisan vendor:publish --tag=laravel-user-authentication-controllers
+php artisan vendor:publish --tag=laravel-user-authentication-docs
+```
+
+Customization points:
+- Implement `ResponseFormatterInterface` for custom JSON envelopes.
+- Implement `MiddlewareHookInterface` and register classes in `middleware_hooks`.
+- Listen to package events for side effects (email/SMS, logging, analytics).
+
+## Notes for Agents
+
+- The package is **not** a standalone Laravel app; it is a package tested inside an Orchestra Testbench workbench.
+- Always run `composer test` after non-trivial changes.
+- Run `composer pint:test`, `composer phpstan`, and `composer phpmd` before considering lint-clean work complete.
+- When adding new events, models, or config keys, update the relevant documentation in `docs/` and the OpenAPI documentation class in `src/Documentation/UserAuthOpenApiDocs.php`.
+- Migrations in `database/migrations/` are loaded automatically by the service provider; workbench-specific migrations live in `workbench/database/migrations/`.
+- Never commit or push codes to the remote repository without authorization from the user.
