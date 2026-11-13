@@ -23,7 +23,7 @@ return new class () extends Migration {
             $table->unsignedInteger('attempts')->default(0);
             $table->timestamp('code_expires_at')->nullable();
             $table->timestamp('link_expires_at')->nullable();
-            $table->timestamp('expires_at')->index();
+            $table->timestamp('expires_at')->useCurrent()->index();
             $table->timestamp('consumed_at')->nullable();
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
