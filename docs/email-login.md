@@ -29,7 +29,7 @@ Valid requests return the same response whether the address has an account:
 
 The status is 202. With `create_users` false, unknown addresses receive nothing. With it true, the account is created only after successful verification. Email domain restrictions apply when requesting a challenge. Addresses are trimmed and normalized to lowercase.
 
-Listen for `VerificationCodeGeneratedEvent`. Its `contact` is the address, `code` is a six digit string, `purpose` is `contact_login`, `type` is `email`, and `magicLink` is the frontend URL with a `token` query parameter. The package delegates delivery to this event, as it does for verification and email 2FA. Use a queued listener for mail delivery so mail transport time does not reveal account existence through request timing. Keep codes and link tokens out of logs.
+Listen for `VerificationCodeGeneratedEvent`. Its `contact` is the address, `code` is a six digit string, `purpose` is `contact_login`, `type` is `email`, and `magicLink` is the frontend URL with a `token` query parameter. The package delegates delivery to this event, as it does for verification and email 2FA. The event is dispatched after the response is sent, so a slow listener does not reveal through response time whether an account exists. A queued listener is still recommended for mail delivery. Keep codes and link tokens out of logs.
 
 Issuance performs hashing and a challenge write even for unknown addresses. A new request replaces both previous credentials for that address. Only hashes are stored. Code and link share an attempt budget and can each succeed only once.
 

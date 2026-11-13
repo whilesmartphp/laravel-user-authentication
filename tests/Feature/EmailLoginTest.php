@@ -2,6 +2,7 @@
 
 namespace Whilesmart\UserAuthentication\Tests\Feature;
 
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -66,6 +67,20 @@ class EmailLoginTest extends TwoFactorTestCase
         Event::assertDispatchedTimes(VerificationCodeGeneratedEvent::class, 1);
         Event::assertDispatched(VerificationCodeGeneratedEvent::class, fn ($event) => $event->contact === $user->email);
         $this->assertDatabaseMissing('users', ['email' => 'unknown@example.com']);
+    }
+
+    public function test_delivery_runs_after_the_response_is_sent(): void
+    {
+        $user = $this->createUser();
+        $kernel = $this->app->make(HttpKernel::class);
+        $request = Request::create('/api/login/email', 'POST', ['email' => $user->email], [], [], [
+            'HTTP_ACCEPT' => 'application/json',
+        ]);
+        $response = $kernel->handle($request);
+        $this->assertSame(202, $response->getStatusCode());
+        Event::assertNotDispatched(VerificationCodeGeneratedEvent::class);
+        $kernel->terminate($request, $response);
+        Event::assertDispatchedTimes(VerificationCodeGeneratedEvent::class, 1);
     }
 
     public function test_code_sign_in_verifies_email_and_returns_only_public_user_fields(): void
