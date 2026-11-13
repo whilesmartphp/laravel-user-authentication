@@ -51,7 +51,7 @@ src/                            Package source (PSR-4: Whilesmart\UserAuthentica
   Http/Controllers/Auth/        Auth, PasswordReset, TwoFactor, Passkey controllers
   Http/Middleware/              two-factor middleware
   Interfaces/                   ResponseFormatterInterface, MiddlewareHookInterface
-  Models/                       User, VerificationCode, OauthAccount, TwoFactorAuth, Passkey
+  Models/                       User, VerificationCode, OauthAccount, AuthFactor, AuthChallenge, RecoveryCode, Passkey
   ResponseFormatters/           Default JSON response formatter
   Rules/                        EmailDomainRestriction validation rule
   Services/                     SmartPingsVerificationService, TwoFactorService, PasskeyService
@@ -78,7 +78,7 @@ demo/                           React + Vite demo frontend (see note below)
 - **Traits**:
   - `ApiResponse` delegates response formatting to the configured formatter.
   - `HasMiddlewareHooks` runs configurable `before`/`after` hooks around controller actions.
-  - `HasTwoFactorAuth` adds the polymorphic `twoFactorAuth` relation and `hasTwoFactorEnabled()` helper.
+  - `HasTwoFactorAuth` adds the polymorphic `factors` and `recoveryCodes` relations and the `hasTwoFactorEnabled()` helper.
 - **Interfaces** allow customization:
   - `ResponseFormatterInterface` for custom API response shapes.
   - `MiddlewareHookInterface` for injecting request/response hooks.
@@ -90,17 +90,19 @@ Routes are prefixed with `config('user-authentication.route_prefix')` (default: 
 Core routes (`routes/user-authentication.php`):
 - `POST /register`
 - `POST /login`
-- `POST /logout` (auth:sanctum)
+- `POST /logout` (auth:sanctum, two-factor)
 - `POST /send-verification-code`
 - `POST /verify-code`
 - `POST /password/reset-code`
 - `POST /password/reset`
-- `POST /2fa/setup` (auth:sanctum)
-- `POST /2fa/confirm` (auth:sanctum)
-- `POST /2fa/disable` (auth:sanctum)
+- `GET /2fa/factors` (auth:sanctum, two-factor)
+- `POST /2fa/recovery-codes` (auth:sanctum, two-factor, throttled)
+- `POST /2fa/setup` (auth:sanctum, two-factor, throttled)
+- `POST /2fa/confirm` (auth:sanctum, two-factor, throttled)
+- `POST /2fa/disable` (auth:sanctum, two-factor, throttled)
 - `POST /2fa/verify` (throttled)
 - `POST /2fa/resend` (throttled)
-- `POST /2fa/verify-link`
+- `POST /2fa/verify-link` (throttled)
 - `POST /passkeys/login/options` (throttled)
 - `POST /passkeys/login` (throttled)
 - `POST /passkeys/register/options` (auth:sanctum, two-factor, throttled)
@@ -239,7 +241,7 @@ Example:
 ```
 feat(auth): Add TOTP-based two-factor authentication
 
-Introduces the TwoFactorAuth model, HasTwoFactorAuth trait, and
+Introduces the AuthFactor model, HasTwoFactorAuth trait, and
 TwoFactorService to support TOTP setup, verification, and recovery codes.
 
 Refs: #21
@@ -251,9 +253,10 @@ For the full shared convention, see [WhileSmart Commit Conventions](https://gith
 
 - **Verification codes** are stored as bcrypt hashes in the `verification_codes` table.
 - **Rate limiting** is applied to password-reset and verification-code endpoints, keyed by both IP and contact.
-- **2FA secrets and recovery codes** are encrypted at rest via Eloquent casts (`encrypted`, `encrypted:array`).
+- **TOTP secrets** are encrypted at rest via the `encrypted` Eloquent cast.
+- **Recovery codes** are stored one per row as salted password hashes and marked used once redeemed.
 - **OAuth tokens** can be optionally encrypted via `encrypt_oauth_tokens` config.
-- **Magic links** are single-use, signed, and expire.
+- **Magic links** are random single-use tokens stored as SHA-256 hashes, and expire with their challenge.
 - **Email domain restrictions** support whitelist or blacklist modes.
 - **SmartPings** mode delegates verification to an external service; missing credentials throw an exception at service construction.
 - Controllers do not trust frontend flags for verification status; backend state is checked during registration.

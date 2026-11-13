@@ -12,7 +12,7 @@ An access token permits access to your application. A pending two-factor token p
 }
 ```
 
-The examples use the default `/api` route prefix. Pending tokens are bound to the account, factor policy, method and purpose. They expire after five minutes by default. Completing or replacing a challenge invalidates its pending token, code and magic link. Only the newest challenge for an account and purpose is valid. Adding, confirming, changing or removing any factor invalidates outstanding pending tokens, including when the new factor is still unconfirmed. Tokens carry a policy derived from the owner’s confirmed factors; factor changes also invalidate existing policies permanently.
+The examples use the default `/api` route prefix. Pending tokens are bound to the account, factor policy, method and purpose. They expire after five minutes by default. Completing or replacing a challenge invalidates its pending token, code and magic link. Only the newest challenge for an account and purpose is valid. Confirming, changing or removing a confirmed factor invalidates outstanding pending tokens. Adding a factor that is not yet confirmed leaves them valid. Pending challenges carry a policy derived from the owner’s confirmed factors; factor changes also invalidate existing policies permanently.
 
 ## TOTP enrollment
 
@@ -23,7 +23,7 @@ Confirmation rejects an already confirmed factor. An owner can register multiple
 
 The enrollment code's timestep is consumed. Wait for a new authenticator code before using TOTP again. Each accepted timestep is recorded under a database lock, so the same timestep cannot authenticate another challenge or disable two-factor authentication. Recovery codes are case-sensitive, ten-character alphanumeric strings, generated with a cryptographically secure random source and stored individually using Laravel’s salted password hashing. They belong to the owner, independently of factors and APP_KEY rotation. Verification locks unused rows, checks the password hashes, and conditionally marks the matching row used. Used rows remain with `used_at` for auditing.
 
-Setup and confirmation require a real Sanctum bearer token. Stateful session authentication alone does not provide a verified bearer.
+Setup and confirmation require a real Sanctum bearer token. Stateful session authentication alone does not provide a verified bearer, and confirmation requested through a session currently fails with HTTP 500.
 
 ## Email and SMS
 
@@ -44,7 +44,7 @@ Send `POST /api/2fa/verify`:
 }
 ```
 
-Use a current TOTP code, the email/SMS code for that pending challenge, or an unused recovery code. A successful response includes an access token with the explicit `2fa-verified` ability and public user identity fields: `id`, `first_name`, `last_name`, `username`, `email`, `phone` and `email_verified_at`. It never includes the factor relationship, secret or recovery codes. Completion dispatches `UserLoggedInEvent` and invokes the original sign-in action's after hooks (`login` or `oauthCallback`). The completion request uses the `verifyTwoFactor` before hook.
+Use a current TOTP code, the email/SMS code for that pending challenge, or an unused recovery code. A successful response includes an access token with the explicit `2fa-verified` ability and public user identity fields: `id`, `first_name`, `last_name`, `username`, `email`, `phone` and `email_verified_at`. It never includes the factor relationship, secret or recovery codes. Completion dispatches `UserLoggedInEvent` and invokes the original sign-in action's after hooks (`login`, `oauthCallback` or `passkeyLogin`). The completion request uses the `verifyTwoFactor` before hook.
 
 For email/SMS, resend with `POST /api/2fa/resend` and `{"two_factor_token":"<opaque-pending-token>","factor_id":1}`. Save the replacement pending token from the response. Earlier codes, links and pending tokens stop working. The same endpoint selects any of the confirmed factors advertised in the pending response. For TOTP it returns a fresh pending token without sending a code.
 
@@ -91,7 +91,7 @@ Named limiters apply independently per IP and per account. Rotating pending toke
 
 Pending tokens are bounded encrypted strings of 100 through 2048 characters. Code inputs accept only 4 through 8 digits or a ten-character alphanumeric recovery code; TOTP itself requires six digits. Link tokens require exactly 64 alphanumeric characters.
 
-Apply `['auth:sanctum', 'two-factor']` to your application's protected routes. The package applies both middleware to its authenticated routes. The middleware checks the current token's actual abilities list; Sanctum's wildcard ability does not qualify. It rejects unverified tokens with HTTP 403 and requires a fresh primary sign-in, without issuing a new challenge. Custom user models should use `HasTwoFactorAuth`, which exposes `factors()`, `recoveryCodes()` and `hasTwoFactorEnabled()` and hides both relationships during serialization. A factor is enabled exactly when `confirmed_at` is set.
+Apply `['auth:sanctum', 'two-factor']` to your application's protected routes. The package applies both middleware to its authenticated routes. The middleware checks the current token's actual abilities list; Sanctum's wildcard ability does not qualify. It rejects unverified tokens with HTTP 403 and requires a fresh primary sign-in, without issuing a new challenge. Custom user models must use `HasTwoFactorAuth`, which exposes `factors()`, `recoveryCodes()` and `hasTwoFactorEnabled()` and hides both relationships during serialization. A factor is enabled exactly when `confirmed_at` is set.
 
 Run the package migrations before serving these endpoints. The tables are `auth_factors`, `auth_recovery_codes` and `auth_challenges`. Multiple factors share one polymorphic owner. Challenge tokens, magic-link hashes and optional binding keys are unique.
 
