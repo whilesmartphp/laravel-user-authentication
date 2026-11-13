@@ -5,6 +5,8 @@ namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\Contracts\HasAbilities;
+use Laravel\Sanctum\PersonalAccessToken;
 use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Models\AuthFactor;
@@ -26,8 +28,19 @@ class TwoFactorController extends Controller
         ];
     }
 
+    private function requiresBearer(Request $request): bool
+    {
+        /** @var HasAbilities|null $token */
+        $token = $request->user()->currentAccessToken();
+
+        return ! $token instanceof PersonalAccessToken;
+    }
+
     public function setup(Request $request)
     {
+        if ($this->requiresBearer($request)) {
+            return $this->failure('Two-factor setup requires a bearer token.', 403);
+        }
         $request->validate(['type' => 'sometimes|string|max:16', 'label' => 'nullable|string|max:255']);
         $user = $request->user();
         $data = app(TwoFactorService::class)->setup($user, $request->input('type', 'totp'), $request->input('label'));
@@ -42,8 +55,11 @@ class TwoFactorController extends Controller
             ...$this->rules(false),
             'code' => ['required', 'string', 'regex:/\A[0-9]{4,8}\z/'],
         ]);
+        if ($this->requiresBearer($request)) {
+            return $this->failure('Two-factor setup requires a bearer token.', 403);
+        }
         $user = $request->user();
-        /** @var \Laravel\Sanctum\PersonalAccessToken $current */
+        /** @var PersonalAccessToken $current */
         $current = $user->currentAccessToken();
 
         return DB::transaction(function () use ($request, $user, $current) {

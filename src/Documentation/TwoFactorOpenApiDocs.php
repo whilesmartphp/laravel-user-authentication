@@ -63,7 +63,10 @@ class TwoFactorOpenApiDocs
         responses: [
             new OA\Response(response: 200, description: 'Factor ID, TOTP secret and QR URI or delivery setup token'),
             new OA\Response(response: 422, description: 'Unknown type, missing contact, duplicate or factor limit'),
-            new OA\Response(response: 403, description: 'Current token has not completed 2FA'),
+            new OA\Response(
+                response: 403,
+                description: 'Current token has not completed 2FA, or the request has no bearer token'
+            ),
             new OA\Response(response: 429, description: 'IP or account limit reached'),
         ]
     )]
@@ -94,6 +97,7 @@ class TwoFactorOpenApiDocs
         responses: [
             new OA\Response(response: 200, description: 'Enabled; current bearer retained and marked verified'),
             new OA\Response(response: 400, description: 'Setup missing or already enabled'),
+            new OA\Response(response: 403, description: 'The request has no bearer token'),
             new OA\Response(
                 response: 422,
                 description: 'Invalid code; setup invalidated after five failed attempts by default'
