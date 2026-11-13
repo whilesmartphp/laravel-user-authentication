@@ -5,7 +5,6 @@ namespace Whilesmart\UserAuthentication\Http\Controllers\Auth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
@@ -18,7 +17,6 @@ use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\OauthUserAuthenticatedEvent;
-use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Events\UserLoggedOutEvent;
 use Whilesmart\UserAuthentication\Events\UserRegisteredEvent;
 use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
@@ -31,12 +29,14 @@ use Whilesmart\UserAuthentication\Services\TwoFactorService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
+use Whilesmart\UserAuthentication\Traits\SignsInUsers;
 
 class AuthController extends Controller
 {
     use ApiResponse;
     use HasMiddlewareHooks;
     use Loggable;
+    use SignsInUsers;
 
     public function register(Request $request): JsonResponse
     {
@@ -473,8 +473,9 @@ class AuthController extends Controller
             return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
         }
 
-        $auth = Firebase::auth();
         try {
+            $auth = Firebase::auth();
+
             $verifiedIdToken = $auth->verifyIdToken($request->token);
             $uid = $verifiedIdToken->claims()->get('sub');
             $user = $auth->getUser($uid);
@@ -516,33 +517,6 @@ class AuthController extends Controller
 
             return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
         }
-    }
-
-    /**
-     * @param User $user
-     */
-    private function signIn(Request $request, $user, HookAction $action, int $status = 200): JsonResponse
-    {
-        return DB::transaction(function () use ($request, $user, $action, $status) {
-            $user = $user->newQuery()->whereKey($user->id)->lockForUpdate()->firstOrFail();
-            $service = app(TwoFactorService::class);
-            if ($user->hasTwoFactorEnabled()) {
-                $pending = $service->issue($user, 'login', $action);
-                if ($pending === null) {
-                    return $this->failure('Two-factor policy changed.', 409);
-                }
-
-                return $this->success($pending, 'Two-factor authentication required.');
-            }
-            UserLoggedInEvent::dispatch($user);
-            $response = $this->success([
-                'token' => $user->createToken('auth-token')->plainTextToken,
-                'token_type' => 'Bearer',
-                'user' => $service->userData($user),
-            ], 'User successfully logged in', $status);
-
-            return $this->runAfterHooks($request, $response, $action);
-        });
     }
 
     /**

@@ -42,7 +42,8 @@
     "laravel/socialite": "^5.23",
     "kreait/laravel-firebase": "^6.1",
     "socialiteproviders/apple": "^5.8",
-    "pragmarx/google2fa-laravel": "^2.3"
+    "pragmarx/google2fa-laravel": "^2.3",
+    "web-auth/webauthn-lib": "^5.3.5"
   },
   "autoload-dev": {
     "psr-4": {

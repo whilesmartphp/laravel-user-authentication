@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is `whilesmart/laravel-user-authentication`, a Laravel package maintained by **WhileSmart** for managing user authentication across PHP projects. It provides API-first authentication endpoints for registration, login, logout, password reset, OAuth (Google, Apple, etc. via Socialite and Firebase), email/phone verification, and two-factor authentication (TOTP and magic links).
+This is `whilesmart/laravel-user-authentication`, a Laravel package maintained by **WhileSmart** for managing user authentication across PHP projects. It provides API-first authentication endpoints for registration, login, logout, password reset, OAuth (Google, Apple, etc. via Socialite and Firebase), email/phone verification, and two-factor authentication (TOTP and magic links), and passkeys (WebAuthn).
 
 - **Package name:** `whilesmart/laravel-user-authentication`
 - **Current version:** `1.0.5`
@@ -21,6 +21,7 @@ The package is intended to be installed into a Laravel application via Composer.
 | API Authentication | Laravel Sanctum |
 | OAuth | Laravel Socialite + Kreait Laravel Firebase |
 | 2FA | PragmaRX Google2FA Laravel |
+| Passkeys | web-auth/webauthn-lib |
 | Managed Verification | SmartPings PHP SDK (`smartpings/php-sdk`) |
 | Testing | PHPUnit + Orchestra Testbench |
 | Code Style | Laravel Pint (PSR-12 preset), PHP_CodeSniffer |
@@ -47,14 +48,14 @@ src/                            Package source (PSR-4: Whilesmart\UserAuthentica
   Documentation/                OpenAPI docs class
   Enums/                        HookAction enum
   Events/                       Laravel events dispatched by the package
-  Http/Controllers/Auth/        Auth, PasswordReset, TwoFactor controllers
+  Http/Controllers/Auth/        Auth, PasswordReset, TwoFactor, Passkey controllers
   Http/Middleware/              two-factor middleware
   Interfaces/                   ResponseFormatterInterface, MiddlewareHookInterface
-  Models/                       User, VerificationCode, OauthAccount, TwoFactorAuth, MagicLink
+  Models/                       User, VerificationCode, OauthAccount, TwoFactorAuth, Passkey
   ResponseFormatters/           Default JSON response formatter
   Rules/                        EmailDomainRestriction validation rule
-  Services/                     SmartPingsVerificationService, TwoFactorService
-  Traits/                       ApiResponse, HasMiddlewareHooks, HasTwoFactorAuth, Loggable
+  Services/                     SmartPingsVerificationService, TwoFactorService, PasskeyService
+  Traits/                       ApiResponse, HasMiddlewareHooks, HasTwoFactorAuth, HasPasskeys, Loggable
   UserAuthenticationServiceProvider.php
 tests/                          PHPUnit feature tests
   Feature/                      One test class per feature area
@@ -68,9 +69,10 @@ demo/                           React + Vite demo frontend (see note below)
 ## Code Organization
 
 - **Controllers** live in `src/Http/Controllers/Auth/` and extend `Illuminate\Routing\Controller`. They use the `ApiResponse`, `HasMiddlewareHooks`, and `Loggable` traits.
-- **Models** are in `src/Models/`. The default `User` model extends `Authenticatable`, uses Sanctum, and includes the `HasTwoFactorAuth` trait. Consumers can override the user model via `config('user-authentication.user_model')`.
+- **Models** are in `src/Models/`. The default `User` model extends `Authenticatable`, uses Sanctum, and includes the `HasTwoFactorAuth` and `HasPasskeys` traits. Consumers can override the user model via `config('user-authentication.user_model')`.
 - **Services** encapsulate verification and 2FA logic:
   - `SmartPingsVerificationService` delegates sending/verifying codes to SmartPings when enabled.
+  - `PasskeyService` handles WebAuthn registration and authentication.
   - `TwoFactorService` handles TOTP, email/SMS challenges, and magic-link generation.
 - **Events** provide extensibility hooks: `UserRegisteredEvent`, `UserLoggedInEvent`, `UserLoggedOutEvent`, `VerificationCodeGeneratedEvent`, `PasswordResetCodeGeneratedEvent`, `PasswordResetCompleteEvent`, `OauthUserAuthenticatedEvent`.
 - **Traits**:
@@ -98,27 +100,44 @@ Core routes (`routes/user-authentication.php`):
 - `POST /2fa/disable` (auth:sanctum)
 - `POST /2fa/verify` (throttled)
 - `POST /2fa/resend` (throttled)
-- `GET /2fa/verify-link/{user}` (signed URL)
+- `POST /2fa/verify-link`
+- `POST /passkeys/login/options` (throttled)
+- `POST /passkeys/login` (throttled)
+- `POST /passkeys/register/options` (auth:sanctum, two-factor, throttled)
+- `POST /passkeys/register` (auth:sanctum, two-factor, throttled)
+- `GET /passkeys` (auth:sanctum, two-factor)
+- `DELETE /passkeys/{id}` (auth:sanctum, two-factor)
 
 OAuth routes (`routes/social-login.php`):
 - `GET /oauth/{driver}/login`
-- `GET /oauth/{driver}/callback`
+- `GET|POST /oauth/{driver}/callback`
 - `POST /oauth/firebase/{driver}/callback`
+
+## Passkeys
+
+- `PasskeyController`, `PasskeyService`, `Passkey`, and `HasPasskeys` implement passkey support.
+- `tests/TestCase.php` provides `createPasskey()` alongside `createUser()`.
+- Passkey ceremony sessions are stored in cache with a configurable lifetime.
+- `USER_AUTH_PASSKEY_ALLOWED_ORIGINS` contains the full frontend origins.
+- `USER_AUTH_PASSKEY_DOMAIN` accepts a full URL or a bare hostname.
+- Resident keys are opt-in through `USER_AUTH_PASSKEY_RESIDENT_KEYS` and enable login without email.
+- Passkey login uses the same second-factor enforcement as password, OAuth, and Firebase login.
+- Passkey documentation is in `docs/passkey.md`; tests cover both feature and service behavior.
 
 ## Configuration
 
 The main config file is `config/user-authentication.php`. Important settings:
 
-- `user_model` — override the default user model.
-- `route_prefix` — prefix for all package routes (`USER_AUTH_ROUTE_PREFIX`).
-- `register_routes` / `register_oauth_routes` — toggle route registration.
-- `response_formatter` — class implementing `ResponseFormatterInterface`.
-- `verification.*` — email/phone verification toggles, code length/expiry, rate limits, provider.
-- `smartpings.*` — SmartPings credentials.
-- `email_restrictions.*` — whitelist/blacklist email domains.
-- `oauth_scopes` — per-provider Socialite scopes.
-- `encrypt_oauth_tokens` — encrypt stored OAuth tokens.
-- `middleware_hooks` — array of hook classes.
+- `user_model`: override the default user model.
+- `route_prefix`: prefix for all package routes (`USER_AUTH_ROUTE_PREFIX`).
+- `register_routes` / `register_oauth_routes`: toggle route registration.
+- `response_formatter`: class implementing `ResponseFormatterInterface`.
+- `verification.*`: email/phone verification toggles, code length/expiry, rate limits, provider.
+- `smartpings.*`: SmartPings credentials.
+- `email_restrictions.*`: whitelist/blacklist email domains.
+- `oauth_scopes`: per-provider Socialite scopes.
+- `encrypt_oauth_tokens`: encrypt stored OAuth tokens.
+- `middleware_hooks`: array of hook classes.
 
 Environment variables are documented in `README.md` and start with `USER_AUTH_*` and `SMARTPINGS_*`.
 
@@ -170,11 +189,11 @@ Docker Compose (`docker-compose.yml`) defines:
 - **Database:** Tests use a SQLite file at `database/database.sqlite` (created on the fly if missing) with `RefreshDatabase`.
 - **Coverage:** The `tests.yml` GitHub Action enforces a minimum code-coverage threshold of **65.8%**.
 - **Test categories:**
-  - `AuthenticationTest` — registration, login (email/phone/username), password reset, verification flows, SmartPings integration.
-  - `VerificationSecurityTest` — rate limiting, expiration, bypass prevention.
-  - `TwoFactorAuthenticationTest`, `TwoFactorMiddlewareTest`, `TwoFactorVerifyTest` — TOTP setup/confirm/disable, middleware interception, recovery codes, magic links.
-  - `OauthTest` — Socialite callback handling and OAuth account linking.
-  - `EmailRestrictionTest` — whitelist/blacklist domain validation.
+  - `AuthenticationTest`: registration, login (email/phone/username), password reset, verification flows, SmartPings integration.
+  - `VerificationSecurityTest`: rate limiting, expiration, bypass prevention.
+  - `TwoFactorAuthenticationTest`, `TwoFactorMiddlewareTest`, `TwoFactorVerifyTest`: TOTP setup/confirm/disable, middleware interception, recovery codes, magic links.
+  - `OauthTest`: Socialite callback handling and OAuth account linking.
+  - `EmailRestrictionTest`: whitelist/blacklist domain validation.
   - `LogoutTest`, `MagicLinkTest`.
 
 Run tests locally:
@@ -243,12 +262,12 @@ For the full shared convention, see [WhileSmart Commit Conventions](https://gith
 
 GitHub Actions workflows are in `.github/workflows/`:
 
-- `tests.yml` — Runs the test suite on PHP 8.3/8.4/8.5 against MySQL 5.7 and enforces coverage.
-- `lint-sniffs.yml` — Runs `phpcs:test`, `phpstan`, `phpmd`, `pint:test`, and verifies OpenAPI generation.
-- `run-tests.yml` — Legacy/test workflow using PHP 8.2 and SQLite.
-- `validate-docs.yml` — Validates documentation using the whilesmart docs-kit action when docs change.
-- `pre-release.yml` / `release.yml` — WhileSmart shared workflows for release management.
-- `commits.yml` — Validates conventional commit messages; allowed types include `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `build`, `ci`, `enh`, `enhance`, `tweak`, `imp`, `improve`. Subject should be sentence-case and header max 80 chars.
+- `tests.yml`: Runs the test suite on PHP 8.3/8.4/8.5 against MySQL 5.7 and enforces coverage.
+- `lint-sniffs.yml`: Runs `phpcs:test`, `phpstan`, `phpmd`, `pint:test`, and verifies OpenAPI generation.
+- `run-tests.yml`: Legacy/test workflow using PHP 8.2 and SQLite.
+- `validate-docs.yml`: Validates documentation using the whilesmart docs-kit action when docs change.
+- `pre-release.yml` / `release.yml`: WhileSmart shared workflows for release management.
+- `commits.yml`: Validates conventional commit messages; allowed types include `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `build`, `ci`, `enh`, `enhance`, `tweak`, `imp`, `improve`. Subject should be sentence-case and header max 80 chars.
 
 ## Publishing and Customization
 

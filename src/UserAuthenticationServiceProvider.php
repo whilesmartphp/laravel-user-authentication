@@ -68,6 +68,21 @@ class UserAuthenticationServiceProvider extends ServiceProvider
             });
         }
 
+        foreach (['login-options', 'login', 'register-options', 'register'] as $action) {
+            RateLimiter::for('passkey-' . $action, function (Request $request) use ($action) {
+                $limits = [Limit::perMinute((int) config('user-authentication.passkey.rate_limits.ip'))
+                    ->by($action . ':ip:' . $request->ip())];
+                $email = str_starts_with($action, 'register')
+                    ? $request->user()?->email
+                    : $request->input('email');
+                if (is_string($email) && $email !== '') {
+                    $limits[] = Limit::perMinute((int) config('user-authentication.passkey.rate_limits.email'))
+                        ->by($action . ':email:' . hash('sha256', strtolower(trim($email))));
+                }
+                return $limits;
+            });
+        }
+
         $this->loadTranslationsFrom(__DIR__ . '/../lang', 'user-authentication');
 
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');

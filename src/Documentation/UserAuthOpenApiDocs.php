@@ -15,6 +15,7 @@ use OpenApi\Attributes as OA;
  * @codeCoverageIgnore
  */
 #[OA\Tag(name: 'Authentication', description: 'Endpoints for user authentication')]
+#[OA\Tag(name: 'Passkey', description: 'Endpoints for WebAuthn passkey management')]
 class UserAuthOpenApiDocs
 {
     #[OA\Post(
@@ -374,7 +375,7 @@ class UserAuthOpenApiDocs
 
     #[OA\Post(
         path: '/2fa/verify',
-        summary: 'Complete the pending password, OAuth or Firebase sign-in',
+        summary: 'Complete the pending password, OAuth, Firebase or passkey sign-in',
         description: 'Primary sign-in returns data.two_factor_token instead of an access token for enabled '
             . 'accounts. Challenges expire after five minutes and permit five attempts by default. '
             . 'Codes, pending tokens and recovery codes are single use. TOTP timesteps cannot be '
@@ -463,6 +464,408 @@ class UserAuthOpenApiDocs
         ]
     )]
     public function verifyMagicLink()
+    {
+    }
+
+    #[OA\Post(
+        path: '/passkeys/register/options',
+        summary: 'Generate WebAuthn registration options',
+        description: 'User verification is required by default. '
+            . 'The single-use session is bound to the authenticated user.',
+        security: [
+            ['sanctum' => []],
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['name'],
+                properties: [
+                    new OA\Property(property: 'name', type: 'string'),
+                ]
+            )
+        ),
+        tags: ['Passkey'],
+        responses: [
+            new OA\Response(response: 429, description: 'Passkey rate limit exceeded'),
+            new OA\Response(
+                response: 200,
+                description: 'Options generated',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(
+                            property: 'data',
+                            properties: [
+                                new OA\Property(
+                                    property: 'options',
+                                    type: 'string',
+                                    description: 'JSON-encoded WebAuthn PublicKeyCredentialCreationOptions',
+                                    example: '{"challenge":"...","rp":{"name":"Laravel","id":"app.example.com"},...}'
+                                ),
+                                new OA\Property(
+                                    property: 'session_id',
+                                    type: 'string',
+                                    example: '550e8400-e29b-41d4-a716-446655440000'
+                                ),
+                            ],
+                            type: 'object'
+                        ),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'Unauthenticated',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 422,
+                description: 'Validation error',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+        ]
+    )]
+    public function passkeyRegisterOptions()
+    {
+    }
+
+    #[OA\Post(
+        path: '/passkeys/login/options',
+        summary: 'Generate WebAuthn login options',
+        description: 'Email requests return a configured number of padded descriptors (default: 10) '
+            . 'regardless of account existence. USER_AUTH_PASSKEY_MAX_CREDENTIALS also caps passkeys per user. '
+            . 'Without email, the allow list is empty. User verification is required by default.',
+        security: [],
+        requestBody: new OA\RequestBody(
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'email', type: 'string', format: 'email'),
+                ]
+            )
+        ),
+        tags: ['Passkey'],
+        responses: [
+            new OA\Response(response: 429, description: 'Passkey rate limit exceeded'),
+            new OA\Response(
+                response: 200,
+                description: 'Options generated',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(
+                            property: 'data',
+                            properties: [
+                                new OA\Property(
+                                    property: 'options',
+                                    type: 'string',
+                                    description: 'JSON-encoded WebAuthn PublicKeyCredentialRequestOptions',
+                                    example: '{"challenge":"...","rpId":"app.example.com","allowCredentials":[...]}'
+                                ),
+                                new OA\Property(
+                                    property: 'session_id',
+                                    type: 'string',
+                                    example: '550e8400-e29b-41d4-a716-446655440000'
+                                ),
+                            ],
+                            type: 'object'
+                        ),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 422,
+                description: 'Validation error',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+        ]
+    )]
+    public function passkeyLoginOptions()
+    {
+    }
+
+    #[OA\Post(
+        path: '/passkeys/login',
+        summary: 'Authenticate using a passkey',
+        description: 'Accounts with two-factor authentication enabled receive a pending challenge instead of an access '
+            . 'token. Complete it through /2fa/verify or /2fa/verify-link. Passkey sign-in preserves the configured '
+            . 'second-factor policy even when WebAuthn user verification succeeds.',
+        security: [],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['session_id', 'passkey'],
+                properties: [
+                    new OA\Property(property: 'session_id', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'passkey', type: 'object'),
+                ]
+            )
+        ),
+        tags: ['Passkey'],
+        responses: [
+            new OA\Response(response: 429, description: 'Passkey rate limit exceeded'),
+            new OA\Response(
+                response: 200,
+                description: 'Authenticated successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(
+                            property: 'data',
+                            properties: [
+                                new OA\Property(property: 'two_factor_required', type: 'boolean'),
+                                new OA\Property(property: 'method', type: 'string'),
+                                new OA\Property(property: 'two_factor_token', type: 'string'),
+                                new OA\Property(property: 'token', type: 'string'),
+                                new OA\Property(property: 'token_type', type: 'string', example: 'Bearer'),
+                                new OA\Property(property: 'user', type: 'object'),
+                            ],
+                            type: 'object'
+                        ),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'Invalid passkey or session',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 422,
+                description: 'Validation error',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+        ]
+    )]
+    public function passkeyLogin()
+    {
+    }
+
+    #[OA\Post(
+        path: '/passkeys/register',
+        summary: 'Register a new passkey for the authenticated user',
+        security: [
+            ['sanctum' => []],
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['name', 'session_id', 'passkey'],
+                properties: [
+                    new OA\Property(property: 'name', type: 'string'),
+                    new OA\Property(property: 'session_id', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'passkey', type: 'object'),
+                ]
+            )
+        ),
+        tags: ['Passkey'],
+        responses: [
+            new OA\Response(response: 409, description: 'Credential already registered or passkey limit reached'),
+            new OA\Response(response: 429, description: 'Passkey rate limit exceeded'),
+            new OA\Response(
+                response: 200,
+                description: 'Passkey created',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'data', type: 'object'),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 400,
+                description: 'Invalid passkey or session',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'Unauthenticated',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 422,
+                description: 'Validation error',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+        ]
+    )]
+    public function passkeyRegister()
+    {
+    }
+
+    #[OA\Get(
+        path: '/passkeys',
+        summary: 'List authenticated user passkeys',
+        security: [
+            ['sanctum' => []],
+        ],
+        tags: ['Passkey'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Passkeys retrieved',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(
+                            property: 'data',
+                            properties: [
+                                new OA\Property(
+                                    property: 'passkeys',
+                                    type: 'array',
+                                    items: new OA\Items(
+                                        properties: [
+                                            new OA\Property(property: 'id', type: 'integer'),
+                                            new OA\Property(property: 'name', type: 'string'),
+                                            new OA\Property(property: 'credential_id', type: 'string'),
+                                            new OA\Property(
+                                                property: 'created_at',
+                                                type: 'string',
+                                                format: 'date-time'
+                                            ),
+                                            new OA\Property(
+                                                property: 'updated_at',
+                                                type: 'string',
+                                                format: 'date-time'
+                                            ),
+                                        ],
+                                        type: 'object'
+                                    )
+                                ),
+                            ],
+                            type: 'object'
+                        ),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'Unauthenticated',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+        ]
+    )]
+    public function passkeyIndex()
+    {
+    }
+
+    #[OA\Delete(
+        path: '/passkeys/{id}',
+        summary: 'Delete a passkey',
+        security: [
+            ['sanctum' => []],
+        ],
+        tags: ['Passkey'],
+        parameters: [
+            new OA\Parameter(
+                name: 'id',
+                description: 'Passkey ID',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'integer')
+            ),
+        ],
+        responses: [
+            new OA\Response(response: 204, description: 'Passkey deleted'),
+            new OA\Response(
+                response: 401,
+                description: 'Unauthenticated',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Passkey not found',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string'),
+                        new OA\Property(property: 'errors', type: 'array', items: new OA\Items()),
+                    ],
+                    type: 'object'
+                )
+            ),
+        ]
+    )]
+    public function passkeyDestroy()
     {
     }
 }

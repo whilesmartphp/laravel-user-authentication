@@ -7,10 +7,54 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Interfaces\MiddlewareHookInterface;
+use Whilesmart\UserAuthentication\Models\Passkey;
+use Whilesmart\UserAuthentication\Services\PasskeyService;
 use Whilesmart\UserAuthentication\Tests\TwoFactorTestCase;
 
 class TwoFactorVerifyTest extends TwoFactorTestCase
 {
+    public function test_passkey_login_requires_the_configured_second_factor()
+    {
+        config([
+            'user-authentication.passkey.domain' => 'https://localhost',
+            'user-authentication.passkey.allowed_origins' => ['https://localhost'],
+            'user-authentication.middleware_hooks' => [TwoFactorLoginHook::class],
+        ]);
+        [$user, , , $codes] = $this->enroll();
+        $passkey = $this->createPasskey($user);
+        $service = new class () extends PasskeyService {
+            public Passkey $passkey;
+
+            public function verifyPasskey(array $passkey, string $options, ?string $userHandle = null): Passkey
+            {
+                return $this->passkey;
+            }
+        };
+        $service->passkey = $passkey;
+        $this->app->instance(PasskeyService::class, $service);
+        $this->app['auth']->forgetGuards();
+        Event::fake([UserLoggedInEvent::class]);
+        $tokensBefore = $user->tokens()->count();
+        $session = $this->postJson('/api/passkeys/login/options', ['email' => $user->email])
+            ->assertOk()->json('data.session_id');
+        $response = $this->postJson('/api/passkeys/login', [
+            'session_id' => $session,
+            'passkey' => ['id' => 'stubbed'],
+        ])->assertOk()->assertJsonPath('data.two_factor_required', true)
+            ->assertJsonPath('data.method', 'totp')->assertJsonMissingPath('data.token');
+        $this->assertSame($tokensBefore, $user->tokens()->count());
+        Event::assertNotDispatched(UserLoggedInEvent::class);
+        $pending = $response->json('data.two_factor_token');
+        $completed = $this->verify($pending, $codes[0])->assertOk()
+            ->assertHeader('X-Login-Hook', 'passkeyLogin')
+            ->assertJsonMissingPath('data.user.twoFactorAuth')
+            ->assertJsonMissingPath('data.user.recovery_codes');
+        Event::assertDispatchedTimes(UserLoggedInEvent::class, 1);
+        $this->getJson('/api/passkeys', $this->bearer($completed->json('data.token')))
+            ->assertOk()->assertJsonCount(1, 'data.passkeys');
+        $this->verify($pending, $codes[0])->assertUnauthorized();
+    }
+
     public function test_email_code_and_pending_token_are_single_use_and_response_is_safe()
     {
         $user = $this->emailUser();
