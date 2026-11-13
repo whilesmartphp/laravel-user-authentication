@@ -29,6 +29,22 @@ class TwoFactorAuthenticationTest extends TwoFactorTestCase
         $this->postJson('/api/2fa/setup', [], $this->bearer($current))->assertOk();
     }
 
+    public function test_setup_and_confirm_reject_session_authentication()
+    {
+        $user = $this->createUser();
+        $this->actingAs($user, 'web')->postJson('/api/2fa/setup')->assertForbidden();
+        $this->assertSame(0, $user->factors()->count());
+        $token = $this->passwordLogin($user)->assertOk()->json('data.token');
+        $secret = $this->postJson('/api/2fa/setup', [], $this->bearer($token))->assertOk()->json('data.secret');
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($user, 'web')->postJson('/api/2fa/confirm', [
+            'factor_id' => $user->factors()->value('id') ?? 0,
+            'code' => app('pragmarx.google2fa')->getCurrentOtp($secret),
+        ])->assertForbidden();
+        $this->assertNull($user->factors()->value('confirmed_at'));
+        $this->assertSame(0, (int) $user->factors()->value('setup_attempts'));
+    }
+
     public function test_disable_requires_a_factor_even_with_no_recovery_codes_remaining()
     {
         [$user, $token, , $codes] = $this->enroll();

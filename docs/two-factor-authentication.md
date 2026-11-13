@@ -23,7 +23,7 @@ Confirmation rejects an already confirmed factor. An owner can register multiple
 
 Wait for your authenticator app to show a new code after enrollment. Each accepted TOTP time window can be used only once, across sign-in and factor removal. A database lock prevents concurrent reuse. Recovery codes are case-sensitive, ten-character alphanumeric strings, generated with a cryptographically secure random source and stored individually using Laravel’s salted password hashing. They belong to the owner, independently of factors and APP_KEY rotation. Verification locks unused rows, checks the password hashes, and conditionally marks the matching row used. Used rows remain with `used_at` for auditing.
 
-Use a Sanctum bearer token for setup and confirmation. Session authentication alone is not enough; confirmation through a session currently returns HTTP 500.
+Use a Sanctum bearer token for setup and confirmation. Requests authenticated only by a session are rejected with HTTP 403.
 
 ## Email and SMS
 
