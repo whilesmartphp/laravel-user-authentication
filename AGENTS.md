@@ -5,7 +5,7 @@
 This is `whilesmart/laravel-user-authentication`, a Laravel package maintained by **WhileSmart** for managing user authentication across PHP projects. It provides API-first authentication endpoints for registration, login, logout, password reset, OAuth (Google, Apple, etc. via Socialite and Firebase), email/phone verification, passwordless email sign-in, two-factor authentication (TOTP and magic links) and passkeys (WebAuthn).
 
 - **Package name:** `whilesmart/laravel-user-authentication`
-- **Current version:** `1.0.5`
+- **Current version:** `2.0.0`
 - **License:** MIT
 - **PHP requirement:** `^8.3`
 - **Primary language:** English (code, comments, and documentation)

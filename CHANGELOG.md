@@ -1,3 +1,11 @@
+## [2.0.0] - 2026-11-14
+- Sign in with a passkey, with optional discoverable credentials for sign-in without an email
+- Two-factor authentication with authenticator apps, email or SMS codes, magic links and recovery codes, with several labeled factors per user
+- Passwordless sign-in with an emailed code or link, off by default, with account creation as a separate opt-in
+- Password, OAuth, Firebase, passkey and email sign-in all require the second factor when one is confirmed
+- Custom user models must use the HasTwoFactorAuth and HasPasskeys traits
+- Run the new migrations, and schedule model:prune for AuthChallenge to clear expired challenges
+
 ## [1.1.0] - 2026-09-22
 - Sign in with Apple
 - Registration can be limited to an allow list or deny list of email domains
