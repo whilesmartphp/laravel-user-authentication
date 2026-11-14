@@ -39,6 +39,48 @@ return [
         'secret_id' => env('SMARTPINGS_SECRET_ID'),
     ],
 
+    'email_login' => [
+        'enabled' => env('USER_AUTH_EMAIL_LOGIN_ENABLED', false),
+        'create_users' => env('USER_AUTH_EMAIL_LOGIN_CREATE_USERS', false),
+        'url' => env('USER_AUTH_EMAIL_LOGIN_URL'),
+        'code_expiry_minutes' => env('USER_AUTH_EMAIL_LOGIN_CODE_EXPIRY_MINUTES', 10),
+        'link_expiry_minutes' => env('USER_AUTH_EMAIL_LOGIN_LINK_EXPIRY_MINUTES', 15),
+        'attempts' => env('USER_AUTH_EMAIL_LOGIN_ATTEMPTS', 5),
+        'rate_limits' => [
+            'minutes' => env('USER_AUTH_EMAIL_LOGIN_RATE_MINUTES', 1),
+            'issue_ip' => env('USER_AUTH_EMAIL_LOGIN_ISSUE_IP_LIMIT', 10),
+            'issue_email' => env('USER_AUTH_EMAIL_LOGIN_ISSUE_EMAIL_LIMIT', 3),
+            'verify_ip' => env('USER_AUTH_EMAIL_LOGIN_VERIFY_IP_LIMIT', 20),
+            'verify_email' => env('USER_AUTH_EMAIL_LOGIN_VERIFY_EMAIL_LIMIT', 5),
+        ],
+    ],
+
+    'two_factor' => [
+        'max_factors' => env('USER_AUTH_2FA_MAX_FACTORS', 5),
+        'challenge_retention_hours' => env('USER_AUTH_2FA_CHALLENGE_RETENTION_HOURS', 24),
+        'types' => [
+            'totp' => \Whilesmart\UserAuthentication\FactorTypes\TotpFactorType::class,
+            'email' => \Whilesmart\UserAuthentication\FactorTypes\EmailFactorType::class,
+            'phone' => \Whilesmart\UserAuthentication\FactorTypes\PhoneFactorType::class,
+        ],
+        'attempts' => env('USER_AUTH_2FA_ATTEMPTS', 5),
+        'expiry_minutes' => env('USER_AUTH_2FA_EXPIRY_MINUTES', 5),
+        'rate_limits' => [
+            'minutes' => env('USER_AUTH_2FA_RATE_MINUTES', 1),
+            'verify' => env('USER_AUTH_2FA_VERIFY_LIMIT', 5),
+            'resend' => env('USER_AUTH_2FA_RESEND_LIMIT', 3),
+            'link' => env('USER_AUTH_2FA_LINK_LIMIT', 5),
+            'setup' => env('USER_AUTH_2FA_SETUP_LIMIT', 5),
+            'confirm' => env('USER_AUTH_2FA_CONFIRM_LIMIT', 5),
+            'disable' => env('USER_AUTH_2FA_DISABLE_LIMIT', 5),
+        ],
+    ],
+
+    // Magic link configuration for two-factor authentication
+    'magic_link' => [
+        'url' => env('USER_AUTH_MAGIC_LINK_URL'),
+    ],
+
     /*
     | Email Domain Restrictions
     | Mode: 'whitelist', 'blacklist', or null to allow all emails
@@ -49,4 +91,22 @@ return [
         'mode' => env('USER_AUTH_EMAIL_RESTRICTION_MODE', null), // 'whitelist', 'blacklist', or null
         'domains' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_EMAIL_RESTRICTION_DOMAINS', '')), 'strlen'))),
     ],
+
+    'passkey' => [
+        'max_credentials' => (int) env('USER_AUTH_PASSKEY_MAX_CREDENTIALS', 10),
+        'user_verification' => env('USER_AUTH_PASSKEY_USER_VERIFICATION', 'required'),
+        'rate_limits' => [
+            'ip' => env('USER_AUTH_PASSKEY_RATE_LIMIT_IP', 30),
+            'email' => env('USER_AUTH_PASSKEY_RATE_LIMIT_EMAIL', 10),
+        ],
+        'session_lifetime' => env('USER_AUTH_PASSKEY_SESSION_LIFETIME', 5), // in minutes
+        'domain' => env('USER_AUTH_PASSKEY_DOMAIN', ''),
+        'attestations' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_PASSKEY_ATTESTATIONS', 'none')), 'strlen'))), // none,packed, fido
+        // Full origins (scheme://host[:port]) allowed to perform WebAuthn ceremonies.
+        // Must include the origin where the frontend is served, e.g. https://app.example.com
+        'allowed_origins' => array_map('strtolower', array_map('trim', array_filter(explode(',', env('USER_AUTH_PASSKEY_ALLOWED_ORIGINS', '')), 'strlen'))), // Must be full origins, e.g. https://localhost, https://app.example.com
+        // Whether to request discoverable (resident) credentials.
+        // Required for passwordless login without entering an email first.
+        'resident_keys' => env('USER_AUTH_PASSKEY_RESIDENT_KEYS', false),
+    ]
 ];

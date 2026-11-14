@@ -66,6 +66,8 @@ HookAction::OAUTH_LOGIN         // 'oauthLogin'
 HookAction::OAUTH_CALLBACK      // 'oauthCallback'
 HookAction::PASSWORD_RESET_REQUEST  // 'passwordResetRequest'
 HookAction::PASSWORD_RESET      // 'passwordReset'
+HookAction::SEND_VERIFICATION_CODE  // 'sendVerificationCode'
+HookAction::VERIFY_CODE         // 'verifyCode'
 ```
 
 You can also use custom string actions for your own implementations:

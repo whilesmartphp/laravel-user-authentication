@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/whilesmart/docs-kit/main/schema/docs.schema.json",
   "name": "Laravel User Authentication",
-  "description": "A comprehensive Laravel package for user authentication with registration, login, password reset, OAuth, and configurable email/phone verification",
+  "description": "Sanctum token authentication for Laravel APIs: passwords, OAuth, Firebase, passkeys and optional two-factor authentication",
   "icon": "shield-check",
   "category": {
     "language": "php",
@@ -10,6 +10,9 @@
   "sidebar": [
     { "title": "Installation", "path": "docs/installation.md" },
     { "title": "Verification", "path": "docs/verification.md" },
+    { "title": "Email sign-in", "path": "docs/email-login.md" },
+    { "title": "Passkeys", "path": "docs/passkey.md" },
+    { "title": "Two-factor authentication", "path": "docs/two-factor-authentication.md" },
     { "title": "Customization", "path": "docs/customization.md" }
   ]
 }

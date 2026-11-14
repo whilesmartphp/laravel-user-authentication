@@ -17,7 +17,6 @@ use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Whilesmart\UserAuthentication\Enums\HookAction;
 use Whilesmart\UserAuthentication\Events\OauthUserAuthenticatedEvent;
-use Whilesmart\UserAuthentication\Events\UserLoggedInEvent;
 use Whilesmart\UserAuthentication\Events\UserLoggedOutEvent;
 use Whilesmart\UserAuthentication\Events\UserRegisteredEvent;
 use Whilesmart\UserAuthentication\Events\VerificationCodeGeneratedEvent;
@@ -26,15 +25,18 @@ use Whilesmart\UserAuthentication\Models\User;
 use Whilesmart\UserAuthentication\Models\VerificationCode;
 use Whilesmart\UserAuthentication\Rules\EmailDomainRestriction;
 use Whilesmart\UserAuthentication\Services\SmartPingsVerificationService;
+use Whilesmart\UserAuthentication\Services\TwoFactorService;
 use Whilesmart\UserAuthentication\Traits\ApiResponse;
 use Whilesmart\UserAuthentication\Traits\HasMiddlewareHooks;
 use Whilesmart\UserAuthentication\Traits\Loggable;
+use Whilesmart\UserAuthentication\Traits\SignsInUsers;
 
 class AuthController extends Controller
 {
     use ApiResponse;
     use HasMiddlewareHooks;
     use Loggable;
+    use SignsInUsers;
 
     public function register(Request $request): JsonResponse
     {
@@ -114,7 +116,7 @@ class AuthController extends Controller
             $this->info("New user with email $request->email just registered ");
 
             $response = [
-                'user' => $user,
+                'user' => app(TwoFactorService::class)->userData($user),
                 'token' => $user->createToken('auth-token')->plainTextToken,
             ];
 
@@ -122,9 +124,9 @@ class AuthController extends Controller
 
             return $this->runAfterHooks($request, $response, HookAction::REGISTER);
         } catch (\Exception $e) {
-            $this->error($e);
+            $this->error('An error occurred during registration: ' . $e->getMessage(), ['exception' => $e]);
 
-            $response = $this->failure('An error occurred', 500);
+            $response = $this->failure('An error occurred during registration.', 500);
 
             return $this->runAfterHooks($request, $response, HookAction::REGISTER);
         }
@@ -160,25 +162,17 @@ class AuthController extends Controller
 
             $user = $User::where($identifier_field, $credentials[$identifier_field])->first();
 
-            if (! $user || ! auth()->attempt($credentials)) {
+            if (! $user || ! Hash::check($request->password, $user->password)) {
                 $response = $this->failure('Invalid credentials', 401);
 
                 return $this->runAfterHooks($request, $response, HookAction::LOGIN);
             }
 
-            UserLoggedInEvent::dispatch($user);
-
-            $response = $this->success([
-                'token' => $user->createToken('auth-token')->plainTextToken,
-                'token_type' => 'Bearer',
-                'user' => auth()->user(),
-            ], 'User successfully logged in', 200);
-
-            return $this->runAfterHooks($request, $response, HookAction::LOGIN);
+            return $this->signIn($request, $user, HookAction::LOGIN);
         } catch (\Exception $e) {
             $this->error('An error occurred during login: ' . $e->getMessage(), ['exception' => $e]);
 
-            $response = $this->failure('An error occurred during login', 500);
+            $response = $this->failure('An error occurred during login.', 500);
 
             return $this->runAfterHooks($request, $response, HookAction::LOGIN);
         }
@@ -276,14 +270,7 @@ class AuthController extends Controller
 
         OauthUserAuthenticatedEvent::dispatch($existing_user, $social_user, $driver, $isNewUser);
 
-        $response = [
-            'user' => $existing_user,
-            'token' => $existing_user->createToken('auth-token')->plainTextToken,
-        ];
-
-        $response = $this->success($response, 'User authenticated successfully', 201);
-
-        return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+        return $this->signIn($request, $existing_user, HookAction::OAUTH_CALLBACK, 201);
     }
 
     public function sendVerificationCode(Request $request): JsonResponse
@@ -446,7 +433,9 @@ class AuthController extends Controller
         $purpose = 'registration_' . $type;
         $errorMessage = ucfirst($type) . ' verification required. Please verify your ' . $type . ' first.';
 
-        if ($smartPingsService->isEnabled()) {
+        $useSelfManaged = config('user-authentication.verification.self_managed', true);
+
+        if (! $useSelfManaged && $smartPingsService->isEnabled()) {
             if (! $smartPingsService->isVerified($contact, $type)) {
                 $response = $this->failure($errorMessage, 422);
 
@@ -471,6 +460,7 @@ class AuthController extends Controller
 
     public function firebaseAuthCallback(Request $request, string $driver)
     {
+        $request = $this->runBeforeHooks($request, HookAction::OAUTH_CALLBACK);
         $driver = strtolower($driver);
         $rules = ['token' => 'required|string'];
 
@@ -483,8 +473,9 @@ class AuthController extends Controller
             return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
         }
 
-        $auth = Firebase::auth();
         try {
+            $auth = Firebase::auth();
+
             $verifiedIdToken = $auth->verifyIdToken($request->token);
             $uid = $verifiedIdToken->claims()->get('sub');
             $user = $auth->getUser($uid);
@@ -514,14 +505,7 @@ class AuthController extends Controller
 
             OauthUserAuthenticatedEvent::dispatch($existing_user, null, $driver, $isNewUser);
 
-            $response = [
-                'user' => $existing_user,
-                'token' => $existing_user->createToken('auth-token')->plainTextToken,
-            ];
-
-            $response = $this->success($response, 'User authenticated successfully', 200);
-
-            return $this->runAfterHooks($request, $response, HookAction::OAUTH_CALLBACK);
+            return $this->signIn($request, $existing_user, HookAction::OAUTH_CALLBACK);
         } catch (FailedToVerifyToken $e) {
             $this->error($e->getMessage());
             $response = $this->failure('Invalid token', 400);
@@ -544,10 +528,7 @@ class AuthController extends Controller
         $existing_user = $User::where('email', $email)->first();
         $isNewUser = false;
 
-        if ($existing_user) {
-            UserLoggedInEvent::dispatch($existing_user);
-            $this->info("User with email $email just logged in via social auth");
-        } else {
+        if (! $existing_user) {
             // Split name to individual names
             $split_names = explode(' ', $name);
             $first_name = $split_names[0];

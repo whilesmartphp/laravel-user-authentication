@@ -1,8 +1,22 @@
 {
   "name": "whilesmart/laravel-user-authentication",
-  "description": "Package for managing user authentication across our projects",
+  "description": "Sanctum token authentication for Laravel APIs: passwords, OAuth, Firebase, passkeys and optional two-factor authentication",
+  "keywords": [
+    "laravel",
+    "authentication",
+    "sanctum",
+    "api",
+    "two-factor-authentication",
+    "totp",
+    "passkeys",
+    "webauthn",
+    "oauth",
+    "socialite",
+    "firebase-auth",
+    "magic-link"
+  ],
   "license": "MIT",
-  "package-version": "1.1.0",
+  "package-version": "2.0.0",
   "authors": [
     {
       "name": "WhileSmart",
@@ -41,7 +55,9 @@
     "laravel/sanctum": "^4.1",
     "laravel/socialite": "^5.23",
     "kreait/laravel-firebase": "^6.1",
-    "socialiteproviders/apple": "^5.8"
+    "socialiteproviders/apple": "^5.8",
+    "pragmarx/google2fa-laravel": "^2.3",
+    "web-auth/webauthn-lib": "^5.3.5"
   },
   "autoload-dev": {
     "psr-4": {

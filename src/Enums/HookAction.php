@@ -7,8 +7,11 @@ namespace Whilesmart\UserAuthentication\Enums;
  */
 enum HookAction: string
 {
+    case VERIFY_TWO_FACTOR = 'verifyTwoFactor';
     case REGISTER = 'register';
     case LOGIN = 'login';
+    case EMAIL_LOGIN_REQUEST = 'emailLoginRequest';
+    case EMAIL_LOGIN_VERIFY = 'emailLoginVerify';
     case LOGOUT = 'logout';
     case OAUTH_LOGIN = 'oauthLogin';
     case OAUTH_CALLBACK = 'oauthCallback';
@@ -16,6 +19,12 @@ enum HookAction: string
     case PASSWORD_RESET = 'passwordReset';
     case SEND_VERIFICATION_CODE = 'sendVerificationCode';
     case VERIFY_CODE = 'verifyCode';
+    case PASSKEY_LOGIN_OPTIONS = 'passkeyLoginOptions';
+    case PASSKEY_REGISTER_OPTIONS = 'passkeyRegisterOptions';
+    case PASSKEY_LOGIN = 'passkeyLogin';
+    case PASSKEY_REGISTER = 'passkeyRegister';
+    case PASSKEY_INDEX = 'passkeyIndex';
+    case PASSKEY_DELETE = 'passkeyDelete';
 
     /**
      * Get all predefined hook actions.
