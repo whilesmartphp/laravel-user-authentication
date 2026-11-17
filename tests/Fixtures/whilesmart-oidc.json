@@ -1,0 +1,91 @@
+{
+  "discovery": {
+    "authorization_endpoint": "https://issuer.example.test/oauth2/authorize",
+    "claims_supported": [
+      "sub",
+      "iss",
+      "aud",
+      "exp",
+      "iat",
+      "name",
+      "given_name",
+      "family_name",
+      "email",
+      "email_verified"
+    ],
+    "code_challenge_methods_supported": [
+      "S256"
+    ],
+    "grant_types_supported": [
+      "authorization_code",
+      "refresh_token"
+    ],
+    "id_token_signing_alg_values_supported": [
+      "RS256"
+    ],
+    "issuer": "https://issuer.example.test",
+    "jwks_uri": "https://issuer.example.test/auth/jwks",
+    "response_types_supported": [
+      "code"
+    ],
+    "scopes_supported": [
+      "openid",
+      "profile",
+      "email",
+      "offline_access",
+      "files.selected.read"
+    ],
+    "subject_types_supported": [
+      "public"
+    ],
+    "token_endpoint": "https://issuer.example.test/oauth2/token",
+    "token_endpoint_auth_methods_supported": [
+      "client_secret_basic",
+      "client_secret_post",
+      "none"
+    ],
+    "userinfo_endpoint": "https://issuer.example.test/oauth2/userinfo"
+  },
+  "jwks": {
+    "keys": [
+      {
+        "kty": "RSA",
+        "use": "sig",
+        "kid": "59686e38-0876-4edf-a66b-11f9801ff880",
+        "alg": "RS256",
+        "n": "replaced-at-runtime",
+        "e": "AQAB"
+      }
+    ]
+  },
+  "userinfo": {
+    "email": "applicant@example.test",
+    "email_verified": true,
+    "family_name": "User",
+    "given_name": "Admin",
+    "name": "Admin User",
+    "sub": "7811f031-2515-4378-964b-bc789c892d79"
+  },
+  "tokens": {
+    "expires_in": 900,
+    "scope": "openid profile email files.selected.read offline_access",
+    "selected_files": [
+      "9a03d571-d87e-4e42-b225-16f852c68a74"
+    ],
+    "token_type": "Bearer"
+  },
+  "id_claims": {
+    "aud": "wa_K3pOHVvwPoezazn2alG0DcSJrJpknu_lb2sAnbAdgkw",
+    "email": "applicant@example.test",
+    "email_verified": true,
+    "exp": 1794840308,
+    "family_name": "User",
+    "given_name": "Admin",
+    "iat": 1794839408,
+    "iss": "https://issuer.example.test",
+    "name": "Admin User",
+    "nonce": "nonce",
+    "sub": "7811f031-2515-4378-964b-bc789c892d79",
+    "type": "oidc_id"
+  }
+}

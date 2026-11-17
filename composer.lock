@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "88d191440315ae41eed5d5fffbf37758",
+    "content-hash": "37ed82186015990aca2b175cb37aab9b",
     "packages": [
         {
             "name": "beste/clock",
@@ -11304,7 +11304,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-02-11T14:48:56+00:00"
+            "time": "2026-02-11T14:48:56+00:00",
+            "published-time": "2026-02-11T14:49:09+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",

@@ -18,6 +18,96 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'Passkey', description: 'Endpoints for WebAuthn passkey management')]
 class UserAuthOpenApiDocs
 {
+    #[OA\Get(
+        path: '/oauth/whilesmart/login',
+        summary: 'Begin browser-bound Whilesmart sign-in',
+        description: 'Sets a browser cookie and returns an authorization URL with state, nonce and PKCE.',
+        tags: ['Authentication'],
+        responses: [new OA\Response(
+            response: 200,
+            description: 'Authorization URL and browser cookie'
+        ),
+             new OA\Response(
+                 response: 503,
+                 description: 'Sign-in unavailable'
+             ),
+             new OA\Response(
+                 response: 429,
+                 description: 'Rate limited'
+             )]
+    )]
+    public function whilesmartLogin()
+    {
+    }
+
+    #[OA\Post(
+        path: '/oauth/whilesmart/link',
+        summary: 'Begin explicit Whilesmart account linking',
+        description: 'Requires a local personal access token and completed two-factor authentication.',
+        tags: ['Authentication'],
+        responses: [new OA\Response(
+            response: 200,
+            description: 'Authorization URL and browser cookie'
+        ),
+             new OA\Response(
+                 response: 400,
+                 description: 'Linking unavailable'
+             ),
+             new OA\Response(
+                 response: 401,
+                 description: 'Authentication required'
+             ),
+             new OA\Response(
+                 response: 403,
+                 description: 'Two-factor authentication required'
+             )]
+    )]
+    public function whilesmartLink()
+    {
+    }
+
+    #[OA\Get(
+        path: '/oauth/whilesmart/callback',
+        summary: 'Complete Whilesmart authorization',
+        description: 'Consumes browser-bound authorization for a local login or explicit account link.',
+        tags: ['Authentication'],
+        parameters: [new OA\Parameter(
+            name: 'code',
+            in: 'query',
+            schema: new OA\Schema(type: 'string')
+        ),
+             new OA\Parameter(
+                 name: 'state',
+                 in: 'query',
+                 required: true,
+                 schema: new OA\Schema(type: 'string')
+             ),
+             new OA\Parameter(
+                 name: 'error',
+                 in: 'query',
+                 schema: new OA\Schema(type: 'string')
+             )],
+        responses: [new OA\Response(
+            response: 200,
+            description: 'Local login token, pending two-factor challenge, or link confirmation'
+        ),
+             new OA\Response(
+                 response: 400,
+                 description: 'Authorization invalid or replayed'
+             ),
+             new OA\Response(
+                 response: 409,
+                 description: 'Explicit linking required or identity collision'
+             ),
+             new OA\Response(
+                 response: 422,
+                 description: 'Verified email or allowed domain required'
+             )]
+    )]
+    public function whilesmartCallback()
+    {
+    }
+
     #[OA\Post(
         path: '/login/email',
         summary: 'Request passwordless email sign-in',

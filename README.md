@@ -209,3 +209,7 @@ composer phpmd
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Login with Whilesmart
+
+Use [Login with Whilesmart](docs/whilesmart-login.md) for browser-bound authorization, explicit account linking and optional encrypted delegated credentials.

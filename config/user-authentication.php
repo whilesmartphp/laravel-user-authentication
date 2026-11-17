@@ -1,6 +1,14 @@
 <?php
 
 return [
+    'whilesmart' => [
+        'issuer' => env('USER_AUTH_WHILESMART_ISSUER', 'https://auth.whilesmart.com'),
+        'client_id' => env('USER_AUTH_WHILESMART_CLIENT_ID'),
+        'client_secret' => env('USER_AUTH_WHILESMART_CLIENT_SECRET'),
+        'redirect_uri' => env('USER_AUTH_WHILESMART_REDIRECT_URI'),
+        'scopes' => ['openid', 'profile', 'email'],
+        'retain_tokens' => env('USER_AUTH_WHILESMART_RETAIN_TOKENS', false),
+    ],
     'user_model' => Whilesmart\UserAuthentication\Models\User::class,
     'register_routes' => true,
     'register_oauth_routes' => true,
